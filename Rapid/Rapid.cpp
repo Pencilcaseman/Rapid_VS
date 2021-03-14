@@ -22,5 +22,9 @@ int main()
 		std::cout << newRes.weight.toString() << "\n\n";
 	}
 
+	auto testArr = rapid::ndarray::Array<double>::fromData({1, 2, 3, 4, 5, 6});
+	std::cout << testArr.toString() << "\n";
+	std::cout << testArr.resized({6, AUTO}).toString() << "\n";
+
 	return 0;
 }

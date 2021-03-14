@@ -1326,6 +1326,8 @@ namespace rapid
 				return res;
 			}
 
+		#define AUTO ((uint64_t) -1)
+
 			/// <summary>
 			/// Resize an array and return the result. The resulting data
 			/// is linked to the parent data, so updating values will
@@ -1338,15 +1340,36 @@ namespace rapid
 				if (prod(newShape) != prod(shape))
 					message::RapidError("Invalid Shape", "Invalid reshape size. Number of elements differ").display();
 
+				auto tmpNewShape = std::vector<uint64_t>(newShape.size(), 1);
+				uint64_t undefined = -1;
+
+				for (uint64_t i = 0; i < newShape.size(); i++)
+				{
+					if (newShape[i] == AUTO)
+					{
+						if (undefined != AUTO)
+							message::RapidError("Resize Error", "Only one AUTO dimension is allowed when resizing").display();
+						else
+							undefined = i;
+					}
+					else
+					{
+						tmpNewShape[i] = newShape[i];
+					}
+				}
+
+				if (undefined != AUTO)
+					tmpNewShape[undefined] = prod(shape) / prod(tmpNewShape);
+
 				bool zeroDim = false;
 
-				if (isZeroDim && newShape.size() == 1)
+				if (isZeroDim && tmpNewShape.size() == 1)
 					zeroDim = true;
 				else
 					zeroDim = false;
 
 				(*originCount)++;
-				auto res = Array<arrayType>::fromData(newShape, dataOrigin, dataStart, originCount, zeroDim);
+				auto res = Array<arrayType>::fromData(tmpNewShape, dataOrigin, dataStart, originCount, zeroDim);
 
 				return res;
 			}
@@ -1360,12 +1383,46 @@ namespace rapid
 				if (prod(newShape) != prod(shape))
 					message::RapidError("Invalid Shape", "Invalid reshape size. Number of elements differ").display();
 
-				if (isZeroDim && newShape.size() == 1)
+				auto tmpNewShape = std::vector<uint64_t>(newShape.size(), 1);
+				uint64_t undefined = -1;
+
+				for (uint64_t i = 0; i < newShape.size(); i++)
+				{
+					if (newShape[i] == AUTO)
+					{
+						if (undefined != AUTO)
+							message::RapidError("Resize Error", "Only one AUTO dimension is allowed when resizing").display();
+						else
+							undefined = i;
+					}
+					else
+					{
+						tmpNewShape[i] = newShape[i];
+					}
+				}
+
+				if (undefined != AUTO)
+					tmpNewShape[undefined] = prod(shape) / prod(tmpNewShape);
+
+				if (isZeroDim && tmpNewShape.size() == 1)
 					isZeroDim = true;
 				else
 					isZeroDim = false;
 
-				shape = newShape;
+				shape = tmpNewShape;
+			}
+
+			template<typename Lambda>
+			inline Array<arrayType> mapped(Lambda func) const
+			{
+				auto res = Array<arrayType>(shape);
+				auto size = prod(shape);
+				auto mode = ExecutionType::SERIAL;
+
+				if (size > 10000) mode = ExecutionType::PARALLEL;
+
+				unaryOpArray(*this, res, mode, func);
+				return res;
 			}
 
 			/// <summary>
@@ -1393,7 +1450,7 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <returns></returns>
 			std::string toString() const;
-			};
+		};
 
 		/// <summary>
 		/// Create a new array of the same size and dimensions as
@@ -1503,6 +1560,24 @@ namespace rapid
 				return x / y;
 			});
 			return res;
+		}
+
+		template<typename t>
+		inline Array<t> minimum(const Array<t> &arr, t x)
+		{
+			return arr.mapped([&](t val)
+			{
+				return val < x ? val : x;
+			});
+		}
+
+		template<typename t>
+		inline Array<t> maximum(const Array<t> &arr, t x)
+		{
+			return arr.mapped([&](t val)
+			{
+				return val > x ? val : x;
+			});
 		}
 
 		/// <summary>
@@ -1792,5 +1867,5 @@ namespace rapid
 
 			return res;
 		}
-		}
 	}
+}

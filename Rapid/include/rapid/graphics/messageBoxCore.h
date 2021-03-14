@@ -389,7 +389,7 @@ namespace rapid
 
 				std::cout << std::string(maxLen + 4, '-') << "\n";
 
-				if (msgLen < maxLen - 4)
+				if (msgLen <= maxLen)
 				{
 					std::cout << "# " << message << " #\n";
 				}
