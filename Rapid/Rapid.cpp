@@ -27,11 +27,11 @@ int main()
 	auto dw = rapid::onesLike(weight);
 
 	auto config = rapid::optim::newConfig<double>();
-	auto res = rapid::optim::rmsprop(weight, dw, config);
+	auto res = rapid::optim::adam(weight, dw, config);
 
 	for (int i = 0; i < 5; i++)
 	{
-		auto newRes = rapid::optim::rmsprop(weight, dw, config);
+		auto newRes = rapid::optim::adam(weight, dw, config);
 		std::cout << newRes.weight.toString() << "\n\n";
 	}
 

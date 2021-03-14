@@ -188,24 +188,24 @@ namespace rapid
 		{
 			if (config.initialized == 0)
 			{
-				config.initialized = 0;
+				config.initialized = 1;
 				config.learningRate.defaultValue = 1e-3;
 				config.beta1.defaultValue = 0.9;
 				config.beta2.defaultValue = 0.999;
 				config.epsilon.defaultValue = 1e-8;
-				config.m.defaultValue = zerosLike(x);
-				config.v.defaultValue = zerosLike(x);
+				config.m.defaultValue.set(zerosLike(x));
+				config.v.defaultValue.set(zerosLike(x));
 				config.t = 0;
 			}
 
-			auto &m = config.m.getValue();
-			auto &v = config.v.getValue();
+			auto m = config.m.getValue();
+			auto v = config.v.getValue();
 			auto t = config.t;
 
 			t++;
-			m = config.beta1.getValue() * m + (1 - config.beta1.getValue()) * dx;
+			m.set(config.beta1.getValue() * m + (1 - config.beta1.getValue()) * dx);
 			auto mCorr = m / (1 - std::pow(config.beta1.getValue(), (ty) t));
-			v = config.beta2.getValue() * v + (1 - config.beta2.getValue()) * (dx * dx);
+			v.set(config.beta2.getValue() * v + (1 - config.beta2.getValue()) * (dx * dx));
 			auto vCorr = v / (1 - std::pow(config.beta2.getValue(), (ty) t));
 			auto nextX = x - config.learningRate.getValue() * mCorr / (sqrt(vCorr) + config.epsilon.getValue());
 			config.m.setValue(m);
