@@ -56,10 +56,10 @@ namespace rapid
 			inline void setValue(const Array<t> &val)
 			{
 				initialized = 1;
-				value = val.copy();
+				value.set(val.copy());
 			}
 
-			inline Array<t> &getValue() const
+			inline Array<t> getValue() const
 			{
 				return initialized ? value : defaultValue;
 			}
@@ -84,6 +84,12 @@ namespace rapid
 		};
 
 		template<typename t>
+		Config<t> newConfig()
+		{
+			return Config<t>{};
+		}
+
+		template<typename t>
 		struct OptimOutput
 		{
 			Array<t> weight;
@@ -98,7 +104,7 @@ namespace rapid
 		/// <param name="config"></param>
 		/// <returns></returns>
 		template<typename t>
-		inline OptimOutput<t> sdg(Array<t> &w, const Array<t> &dw, Config<t> &config)
+		inline OptimOutput<t> sgd(Array<t> &w, const Array<t> &dw, Config<t> &config)
 		{
 			if (config.initialized == 0)
 			{
@@ -120,19 +126,19 @@ namespace rapid
 		/// <param name="config"></param>
 		/// <returns></returns>
 		template<typename t>
-		inline OptimOutput<t> sdgMomentum(Array<t> &w, const Array<t> &dw, Config<t> &config)
+		inline OptimOutput<t> sgdMomentum(Array<t> &w, const Array<t> &dw, Config<t> &config)
 		{
 			if (config.initialized == 0)
 			{
 				config.initialized = 1;
 				config.learningRate.defaultValue = 1e-2;
 				config.momentum.defaultValue = 0.9;
-				config.velocity.defaultValue = zerosLike(w);
+				config.velocity.defaultValue.set(zerosLike(w));
 			}
 
 			// Momentum update formula -- also update velocity
 			auto v = config.velocity.getValue();
-			v = config.momentum.getValue() * v - config.learningRate.getValue() * dw;
+			v.set(config.momentum.getValue() * v - config.learningRate.getValue() * dw);
 			auto nextW = w + v;
 			config.velocity.setValue(v);
 
@@ -156,12 +162,12 @@ namespace rapid
 				config.initialized = 1;
 				config.learningRate.defaultValue = 1e-2;
 				config.decayRate.defaultValue = 0.99;
-				config.epsilon = 1e-8;
-				config.cache = zerosLike(x);
+				config.epsilon.defaultValue = 1e-8;
+				config.cache.setValue(zerosLike(x));
 			}
 
 			auto cache = config.cache.getValue();
-			cache = config.decayRate.getValue() * cache + (1 - config.decayRate.getValue()) * (dx * dx);
+			cache.set(config.decayRate.getValue() * cache + (1 - config.decayRate.getValue()) * (dx * dx));
 			auto nextX = x - config.learningRate.getValue() * dx / (sqrt(cache) + config.epsilon.getValue());
 			config.cache.setValue(cache);
 

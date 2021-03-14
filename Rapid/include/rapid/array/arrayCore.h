@@ -58,7 +58,8 @@ namespace rapid
 		/// <param name="shape"></param>
 		/// <returns></returns>
 		template<typename indexT, typename shapeT>
-		inline indexT ndToScalar(const std::vector<indexT> &index, const std::vector<shapeT> &shape)
+		inline indexT ndToScalar(const std::vector<indexT> &index,
+								 const std::vector<shapeT> &shape)
 		{
 			indexT sig = 1;
 			indexT pos = 0;
@@ -82,7 +83,8 @@ namespace rapid
 		/// <param name="shape"></param>
 		/// <returns></returns>
 		template<typename indexT, typename shapeT>
-		inline indexT ndToScalar(const std::initializer_list<indexT> &index, const std::vector<shapeT> &shape)
+		inline indexT ndToScalar(const std::initializer_list<indexT> &index,
+								 const std::vector<shapeT> &shape)
 		{
 			indexT sig = 1;
 			indexT pos = 0;
@@ -155,7 +157,8 @@ namespace rapid
 		/// <param name="mode"></param>
 		/// <param name="func"></param>
 		template<typename Lambda>
-		inline static void binaryOpArrayArray(const Array<arrayType> &a, const Array<arrayType> &b, Array<arrayType> &c, ExecutionType mode, Lambda func)
+		inline static void binaryOpArrayArray(const Array<arrayType> &a, const Array<arrayType> &b,
+											  Array<arrayType> &c, ExecutionType mode, Lambda func)
 		{
 			size_t size = prod(a.shape);
 
@@ -207,7 +210,8 @@ namespace rapid
 		/// <param name="mode"></param>
 		/// <param name="func"></param>
 		template<typename Lambda>
-		inline static void binaryOpArrayScalar(const Array<arrayType> &a, const arrayType &b, Array<arrayType> &c, ExecutionType mode, Lambda func)
+		inline static void binaryOpArrayScalar(const Array<arrayType> &a, const arrayType &b,
+											   Array<arrayType> &c, ExecutionType mode, Lambda func)
 		{
 			size_t size = prod(a.shape);
 
@@ -259,7 +263,8 @@ namespace rapid
 		/// <param name="mode"></param>
 		/// <param name="func"></param>
 		template<typename Lambda>
-		inline static void binaryOpScalarArray(const arrayType &a, const Array<arrayType> &b, Array<arrayType> &c, ExecutionType mode, Lambda func)
+		inline static void binaryOpScalarArray(const arrayType &a, const Array<arrayType> &b,
+											   Array<arrayType> &c, ExecutionType mode, Lambda func)
 		{
 			size_t size = prod(b.shape);
 
@@ -307,7 +312,8 @@ namespace rapid
 		/// <param name="mode"></param>
 		/// <param name="func"></param>
 		template<typename Lambda>
-		inline static void unaryOpArray(const Array<arrayType> &a, Array<arrayType> &b, ExecutionType mode, Lambda func)
+		inline static void unaryOpArray(const Array<arrayType> &a, Array<arrayType> &b,
+										ExecutionType mode, Lambda func)
 		{
 			size_t size = prod(a.shape);
 
@@ -361,7 +367,8 @@ namespace rapid
 			auto thisData = dataStart;
 
 			for (size_t i = 0; i < rapid::min(shape[0], newShape[0]); i++)
-				memcpy(resData + i * newShape[1], thisData + i * shape[1], sizeof(arrayType) * rapid::min(shape[1], newShape[1]));
+				memcpy(resData + i * newShape[1], thisData + i * shape[1],
+					   sizeof(arrayType) * rapid::min(shape[1], newShape[1]));
 
 			return res;
 		}
@@ -404,9 +411,34 @@ namespace rapid
 		{
 			isZeroDim = true;
 			shape = {0};
-			dataStart = nullptr;
-			dataOrigin = nullptr;
-			originCount = nullptr;
+			
+			dataStart = new arrayType[1];
+			dataStart[0] = (arrayType) 0;
+
+			dataOrigin = dataStart;
+
+			originCount = new uint64_t;
+			*originCount = 1;
+		}
+
+		inline void set(const Array<arrayType> &other)
+		{
+			(*originCount)--;
+
+			if ((*originCount) == 0)
+			{
+				delete[] dataOrigin;
+				delete originCount;
+			}
+
+			isZeroDim = other.isZeroDim;
+			shape = other.shape;
+
+			dataStart = other.dataStart;
+			dataOrigin = other.dataOrigin;
+
+			originCount = other.originCount;
+			(*originCount)++;
 		}
 
 		/// <summary>
@@ -497,7 +529,9 @@ namespace rapid
 		/// <param name="originCount"></param>
 		/// <param name="isZeroDim"></param>
 		/// <returns></returns>
-		static inline Array<arrayType> fromData(const std::vector<size_t> &arrDims, arrayType *newDataOrigin, arrayType *dataStart, size_t *originCount, bool isZeroDim)
+		static inline Array<arrayType> fromData(const std::vector<size_t> &arrDims,
+												arrayType *newDataOrigin, arrayType *dataStart,
+												size_t *originCount, bool isZeroDim)
 		{
 			Array<arrayType> res;
 			res.isZeroDim = isZeroDim;
@@ -600,10 +634,12 @@ namespace rapid
 			(*originCount)++;
 
 			if (shape.size() == 1)
-				return Array<arrayType>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape), originCount, true);
+				return Array<arrayType>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+												  originCount, true);
 
 			std::vector<size_t> resShape(shape.begin() + 1, shape.end());
-			return Array<arrayType>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape), originCount, isZeroDim);
+			return Array<arrayType>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+											  originCount, isZeroDim);
 		}
 
 		/// <summary>
@@ -656,11 +692,13 @@ namespace rapid
 		/// </summary>
 		/// <param name="other"></param>
 		/// <returns></returns>
-		inline Array<arrayType> operator+(const Array<arrayType> &other)const
+		inline Array<arrayType> operator+(const Array<arrayType> &other) const
 		{
 			rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 			auto res = Array<arrayType>(shape);
-			Array<arrayType>::binaryOpArrayArray(*this, other, res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](arrayType x, arrayType y)
+			Array<arrayType>::binaryOpArrayArray(*this, other, res,
+												 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												 [](arrayType x, arrayType y)
 			{
 				return x + y;
 			});
@@ -672,11 +710,13 @@ namespace rapid
 		/// </summary>
 		/// <param name="other"></param>
 		/// <returns></returns>
-		inline Array<arrayType> operator-(const Array<arrayType> &other)const
+		inline Array<arrayType> operator-(const Array<arrayType> &other) const
 		{
 			rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 			auto res = Array<arrayType>(shape);
-			Array<arrayType>::binaryOpArrayArray(*this, other, res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](arrayType x, arrayType y)
+			Array<arrayType>::binaryOpArrayArray(*this, other, res,
+												 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												 [](arrayType x, arrayType y)
 			{
 				return x - y;
 			});
@@ -688,11 +728,13 @@ namespace rapid
 		/// </summary>
 		/// <param name="other"></param>
 		/// <returns></returns>
-		inline Array<arrayType> operator*(const Array<arrayType> &other)const
+		inline Array<arrayType> operator*(const Array<arrayType> &other) const
 		{
 			rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 			auto res = Array<arrayType>(shape);
-			Array<arrayType>::binaryOpArrayArray(*this, other, res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](arrayType x, arrayType y)
+			Array<arrayType>::binaryOpArrayArray(*this, other, res,
+												 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												 [](arrayType x, arrayType y)
 			{
 				return x * y;
 			});
@@ -704,11 +746,13 @@ namespace rapid
 		/// </summary>
 		/// <param name="other"></param>
 		/// <returns></returns>
-		inline Array<arrayType> operator/(const Array<arrayType> &other)const
+		inline Array<arrayType> operator/(const Array<arrayType> &other) const
 		{
 			rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 			auto res = Array<arrayType>(shape);
-			Array<arrayType>::binaryOpArrayArray(*this, other, res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](arrayType x, arrayType y)
+			Array<arrayType>::binaryOpArrayArray(*this, other, res,
+												 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												 [](arrayType x, arrayType y)
 			{
 				return x / y;
 			});
@@ -722,10 +766,12 @@ namespace rapid
 		/// <param name="other"></param>
 		/// <returns></returns>
 		template<typename t>
-		inline Array<arrayType> operator+(const t &other)const
+		inline Array<arrayType> operator+(const t &other) const
 		{
 			auto res = Array<arrayType>(shape);
-			Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](arrayType x, arrayType y)
+			Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other,
+												  res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												  [](arrayType x, arrayType y)
 			{
 				return x + y;
 			});
@@ -739,10 +785,12 @@ namespace rapid
 		/// <param name="other"></param>
 		/// <returns></returns>
 		template<typename t>
-		inline Array<arrayType> operator-(const t &other)const
+		inline Array<arrayType> operator-(const t &other) const
 		{
 			auto res = Array<arrayType>(shape);
-			Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](arrayType x, arrayType y)
+			Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
+												  prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												  [](arrayType x, arrayType y)
 			{
 				return x - y;
 			});
@@ -756,10 +804,12 @@ namespace rapid
 		/// <param name="other"></param>
 		/// <returns></returns>
 		template<typename t>
-		inline Array<arrayType> operator*(const t &other)const
+		inline Array<arrayType> operator*(const t &other) const
 		{
 			auto res = Array<arrayType>(shape);
-			Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](arrayType x, arrayType y)
+			Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
+												  prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												  [](arrayType x, arrayType y)
 			{
 				return x * y;
 			});
@@ -773,14 +823,68 @@ namespace rapid
 		/// <param name="other"></param>
 		/// <returns></returns>
 		template<typename t>
-		inline Array<arrayType> operator/(const t &other)const
+		inline Array<arrayType> operator/(const t &other) const
 		{
 			auto res = Array<arrayType>(shape);
-			Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](arrayType x, arrayType y)
+			Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
+												  prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												  [](arrayType x, arrayType y)
 			{
 				return x / y;
 			});
 			return res;
+		}
+
+		inline Array<arrayType> &operator+=(const Array<arrayType> &other)
+		{
+			rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
+			Array<arrayType>::binaryOpArrayArray(*this, other, *this,
+												 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												 [](arrayType x, arrayType y)
+			{
+				return x + y;
+			});
+
+			return *this;
+		}
+
+		inline Array<arrayType> &operator-=(const Array<arrayType> &other)
+		{
+			rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
+			Array<arrayType>::binaryOpArrayArray(*this, other, *this,
+												 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												 [](arrayType x, arrayType y)
+			{
+				return x - y;
+			});
+
+			return *this;
+		}
+
+		inline Array<arrayType> &operator*=(const Array<arrayType> &other)
+		{
+			rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
+			Array<arrayType>::binaryOpArrayArray(*this, other, *this,
+												 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												 [](arrayType x, arrayType y)
+			{
+				return x * y;
+			});
+
+			return *this;
+		}
+
+		inline Array<arrayType> &operator/=(const Array<arrayType> &other)
+		{
+			rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
+			Array<arrayType>::binaryOpArrayArray(*this, other, *this,
+												 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												 [](arrayType x, arrayType y)
+			{
+				return x / y;
+			});
+
+			return *this;
 		}
 
 		/// <summary>
@@ -789,7 +893,9 @@ namespace rapid
 		/// <param name="val"></param>
 		inline void fill(const arrayType &val)
 		{
-			Array<arrayType>::unaryOpArray(*this, *this, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [=](arrayType x)
+			Array<arrayType>::unaryOpArray(*this, *this,
+										   prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+										   [=](arrayType x)
 			{
 				return val;
 			});
@@ -955,9 +1061,12 @@ namespace rapid
 						// Tile size
 						static const int TS = 32;
 
-						const auto resizedThis = internal_resized({rapid::roundUp(shape[0], (size_t) TS), rapid::roundUp(shape[1], (size_t) TS)});
-						const auto resizedOther = internal_resized({rapid::roundUp(other.shape[0], (size_t) TS), rapid::roundUp(other.shape[1], (size_t) TS)});
-						res.internal_resize({rapid::roundUp(shape[0], (size_t) TS), rapid::roundUp(other.shape[1], (size_t) TS)});
+						const auto resizedThis = internal_resized({rapid::roundUp(shape[0], (size_t) TS),
+																  rapid::roundUp(shape[1], (size_t) TS)});
+						const auto resizedOther = internal_resized({rapid::roundUp(other.shape[0], (size_t) TS),
+																   rapid::roundUp(other.shape[1], (size_t) TS)});
+						res.internal_resize({rapid::roundUp(shape[0], (size_t) TS),
+											rapid::roundUp(other.shape[1], (size_t) TS)});
 
 						auto M = (unsigned int) resizedThis.shape[0];
 						auto N = (unsigned int) resizedThis.shape[1];
@@ -1242,6 +1351,61 @@ namespace rapid
 	}
 
 	/// <summary>
+	/// Create a new array of the same size and dimensions as
+	/// another array, but fill it with ones
+	/// </summary>
+	/// <typeparam name="t"></typeparam>
+	/// <param name="other"></param>
+	/// <returns></returns>
+	template<typename t>
+	inline Array<t> onesLike(const Array<t> &other)
+	{
+		auto res = Array<t>(other.shape);
+		res.fill((t) 1);
+		return res;
+	}
+
+	/// <summary>
+	/// Reverse addition
+	/// </summary>
+	/// <typeparam name="t"></typeparam>
+	/// <param name="val"></param>
+	/// <param name="other"></param>
+	/// <returns></returns>
+	template<typename t>
+	inline Array<t> operator+(t val, const Array<t> &other)
+	{
+		auto res = Array<t>(other.shape);
+		Array<t>::binaryOpScalarArray(val, other, res,
+									  prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+									  [](t x, t y)
+		{
+			return x + y;
+		});
+		return res;
+	}
+
+	/// <summary>
+	/// Reverse subtraction
+	/// </summary>
+	/// <typeparam name="t"></typeparam>
+	/// <param name="val"></param>
+	/// <param name="other"></param>
+	/// <returns></returns>
+	template<typename t>
+	inline Array<t> operator-(t val, const Array<t> &other)
+	{
+		auto res = Array<t>(other.shape);
+		Array<t>::binaryOpScalarArray(val, other, res,
+									  prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+									  [](t x, t y)
+		{
+			return x - y;
+		});
+		return res;
+	}
+
+	/// <summary>
 	/// Reverse multiplication
 	/// </summary>
 	/// <typeparam name="t"></typeparam>
@@ -1252,9 +1416,31 @@ namespace rapid
 	inline Array<t> operator*(t val, const Array<t> &other)
 	{
 		auto res = Array<t>(other.shape);
-		Array<t>::binaryOpScalarArray(val, other, res, prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL, [](t x, t y)
+		Array<t>::binaryOpScalarArray(val, other, res,
+									  prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+									  [](t x, t y)
 		{
 			return x * y;
+		});
+		return res;
+	}
+
+	/// <summary>
+	/// Reverse division
+	/// </summary>
+	/// <typeparam name="t"></typeparam>
+	/// <param name="val"></param>
+	/// <param name="other"></param>
+	/// <returns></returns>
+	template<typename t>
+	inline Array<t> operator/(t val, const Array<t> &other)
+	{
+		auto res = Array<t>(other.shape);
+		Array<t>::binaryOpScalarArray(val, other, res,
+									  prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+									  [](t x, t y)
+		{
+			return x / y;
 		});
 		return res;
 	}

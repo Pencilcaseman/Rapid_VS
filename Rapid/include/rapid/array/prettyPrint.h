@@ -41,7 +41,8 @@ namespace rapid
 		/// <param name="depth"></param>
 		/// <param name="stripMiddle"></param>
 		/// <returns></returns>
-		std::string toString(const std::vector<std::string> &adjusted, const std::vector<size_t> &shape, size_t depth, bool stripMiddle)
+		std::string toString(const std::vector<std::string> &adjusted, const std::vector<size_t> &shape,
+							 size_t depth, bool stripMiddle)
 		{
 			if (shape.size() == 1)
 				return toString1D(adjusted, stripMiddle);
@@ -135,66 +136,6 @@ namespace rapid
 		}
 	}
 
-	/// <summary>
-	/// Get a string representation of an array
-	/// </summary>
-	/// <typeparam name="t"></typeparam>
-	/// <returns></returns>
-// 	template<typename t>
-// 	std::string Array<t>::toString() const
-// 	{
-// 		if (isZeroDim)
-// 			return std::to_string(dataStart[0]);
-// 
-// 		size_t allocate = 1;
-// 
-// 		std::vector<utils::strContainer> formatted(prod(shape));
-// 		size_t longestIntegral = 0;
-// 		size_t longestDecimal = 0;
-// 
-// 		{
-// 			auto timer = rapid::RapidTimer();
-// 
-// 			for (size_t i = 0; i < prod(shape); i++)
-// 			{
-// 				formatted[i] = utils::formatNumerical(dataStart[i]);
-// 
-// 				if (formatted[i].decimalPoint > longestIntegral)
-// 					longestIntegral = formatted[i].decimalPoint;
-// 
-// 				if (formatted[i].str.length() >= formatted[i].decimalPoint && formatted[i].str.length() - formatted[i].decimalPoint > longestDecimal)
-// 					longestDecimal = formatted[i].str.length() - formatted[i].decimalPoint;
-// 			}
-// 		}
-// 
-// 		std::vector<std::string> adjusted(formatted.size());
-// 
-// 		for (size_t i = 0; i < formatted.size(); i++)
-// 		{
-// 			const auto &term = formatted[i];
-// 			auto decimal = term.str.length() - term.decimalPoint - 1;
-// 
-// 			size_t bufferLeft = 0;
-// 
-// 			auto tmp = std::string(longestIntegral - term.decimalPoint, ' ') + term.str + std::string(longestDecimal - decimal, ' ');
-// 			adjusted[i] = tmp;
-// 		}
-// 
-// 		// General checks
-// 		bool stripMiddle = false;
-// 		if (prod(shape) > 1000)
-// 			stripMiddle = true;
-// 
-// 		// Edge case
-// 		if (shape.size() == 2 && shape[1] == 1)
-// 			stripMiddle = false;
-// 
-// 		auto res = utils::toString(adjusted, shape, 1, stripMiddle);
-// 
-// 		return res;
-// 	}
-
-
 	template<typename t>
 	std::string Array<t>::toString() const
 	{
@@ -239,7 +180,8 @@ namespace rapid
 				if (formatted[index].decimalPoint > longestIntegral)
 					longestIntegral = formatted[index].decimalPoint;
 
-				if (formatted[index].str.length() >= formatted[index].decimalPoint && formatted[index].str.length() - formatted[index].decimalPoint > longestDecimal)
+				if (formatted[index].str.length() >= formatted[index].decimalPoint &&
+					formatted[index].str.length() - formatted[index].decimalPoint > longestDecimal)
 					longestDecimal = formatted[index].str.length() - formatted[index].decimalPoint;
 			}
 		}
