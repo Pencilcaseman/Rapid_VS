@@ -227,6 +227,7 @@
     <ClInclude Include="include\rapid\graphics\GLFW\glfw3native.h" />
     <ClInclude Include="include\rapid\graphics\graphicsCore.h" />
     <ClInclude Include="include\rapid\graphics\messageBoxCore.h" />
+    <ClInclude Include="include\rapid\graphics\olcPGE\olcPixelGameEngine.h" />
     <ClInclude Include="include\rapid\graphics\pixelEngineCore.h" />
     <ClInclude Include="include\rapid\graphics\textRenderer.h" />
     <ClInclude Include="include\rapid\internal.h" />
@@ -235,6 +236,7 @@
     <ClInclude Include="include\rapid\IO\createDir.h" />
     <ClInclude Include="include\rapid\IO\systemExecute.h" />
     <ClInclude Include="include\rapid\math.h" />
+    <ClInclude Include="include\rapid\network\layers.h" />
     <ClInclude Include="include\rapid\network\optimizers.h" />
     <ClInclude Include="include\rapid\parser.h" />
     <ClInclude Include="include\rapid\parser\mathParserCore.h" />
@@ -250,6 +252,7 @@
     <ClInclude Include="include\rapid\parser\utils.h" />
     <ClInclude Include="include\rapid\rapid.h" />
     <ClInclude Include="include\rapid\vector.h" />
+    <ClInclude Include="include\rapid\vector\vec2.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="include\rapid\graphics\glew\doc\advanced.html" />

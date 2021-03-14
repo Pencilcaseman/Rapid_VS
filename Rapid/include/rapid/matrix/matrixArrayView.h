@@ -2,37 +2,40 @@
 
 namespace rapid
 {
-	template<typename T>
-	class ArrayView
+	namespace matrix
 	{
-		T *ptr_;
-		size_t len_;
-	public:
-		ArrayView(T *ptr, size_t len) noexcept : ptr_{ptr}, len_{len} {}
-
-		T &operator[](size_t i) noexcept
+		template<typename T>
+		class ArrayView
 		{
-			return ptr_[i];
-		}
+			T *ptr_;
+			size_t len_;
+		public:
+			ArrayView(T *ptr, size_t len) noexcept : ptr_{ptr}, len_{len} {}
 
-		T &operator[](size_t i) const noexcept
-		{
-			return ptr_[i];
-		}
+			T &operator[](size_t i) noexcept
+			{
+				return ptr_[i];
+			}
 
-		auto size() const noexcept
-		{
-			return len_;
-		}
+			T &operator[](size_t i) const noexcept
+			{
+				return ptr_[i];
+			}
 
-		auto begin() noexcept
-		{
-			return ptr_;
-		}
+			auto size() const noexcept
+			{
+				return len_;
+			}
 
-		auto end() noexcept
-		{
-			return ptr_ + len_;
-		}
-	};
+			auto begin() noexcept
+			{
+				return ptr_;
+			}
+
+			auto end() noexcept
+			{
+				return ptr_ + len_;
+			}
+		};
+	}
 }

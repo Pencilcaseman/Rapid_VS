@@ -6,4 +6,4 @@
 #endif
 
 #define OLC_PGE_APPLICATION
-#include "graphics/olcPGE/olcPixelGameEngine.h" // olcPGE is awesome, and works cross-platform, so include it regardless
+#include "graphics/olcPGE/olcPixelGameEngine.h" // olcPGE is awesome and works cross-platform, so include it regardless

@@ -290,6 +290,15 @@
     <ClInclude Include="include\rapid\network\optimizers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="include\rapid\network\layers.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rapid\vector\vec2.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="include\rapid\graphics\olcPGE\olcPixelGameEngine.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="include\rapid\graphics\glew\doc\advanced.html" />

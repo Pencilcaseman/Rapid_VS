@@ -8,24 +8,27 @@
 
 namespace rapid
 {
-	FT_Library freeTypeLibrary;
-
-	void initializeFreeType()
+	namespace graphics
 	{
-		if (FT_Init_FreeType(&freeTypeLibrary))
-		{
-			RapidError("Font Error", "Could not initialize FreeType").display();
-		}
-	}
+		FT_Library freeTypeLibrary;
 
-	void loadFont(std::string font)
-	{
-		FT_Face face;
-		if (FT_New_Face(freeTypeLibrary, (std::string("C:/Windows/Fonts/") + font + ".ttf").c_str(), 0, &face))
+		void initializeFreeType()
 		{
-			RapidError("Font Error", "Could not load font " + font).display();
+			if (FT_Init_FreeType(&freeTypeLibrary))
+			{
+				RapidError("Font Error", "Could not initialize FreeType").display();
+			}
 		}
 
-		FT_Set_Pixel_Sizes(face, 0, 48);
+		void loadFont(std::string font)
+		{
+			FT_Face face;
+			if (FT_New_Face(freeTypeLibrary, (std::string("C:/Windows/Fonts/") + font + ".ttf").c_str(), 0, &face))
+			{
+				RapidError("Font Error", "Could not load font " + font).display();
+			}
+
+			FT_Set_Pixel_Sizes(face, 0, 48);
+		}
 	}
 }

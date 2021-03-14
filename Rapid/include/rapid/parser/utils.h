@@ -4,72 +4,75 @@
 
 namespace rapid
 {
-	std::vector<std::string> splitString(const std::string &string, const std::vector<std::string> delimiters = {" "})
+	namespace parser
 	{
-		std::vector<std::string> res;
-
-		uint64_t start = 0;
-		uint64_t end = 0;
-
-		while (end != std::string::npos)
+		std::vector<std::string> splitString(const std::string &string, const std::vector<std::string> delimiters = {" "})
 		{
-			// Find the nearest delimiter
-			uint64_t nearest = -1;
-			uint64_t index = 0;
+			std::vector<std::string> res;
 
-			for (uint64_t i = 0; i < delimiters.size(); i++)
+			uint64_t start = 0;
+			uint64_t end = 0;
+
+			while (end != std::string::npos)
 			{
-				auto pos = string.find(delimiters[i], start);
-				if (pos != std::string::npos && pos < nearest)
+				// Find the nearest delimiter
+				uint64_t nearest = -1;
+				uint64_t index = 0;
+
+				for (uint64_t i = 0; i < delimiters.size(); i++)
 				{
-					nearest = pos;
-					index = i;
+					auto pos = string.find(delimiters[i], start);
+					if (pos != std::string::npos && pos < nearest)
+					{
+						nearest = pos;
+						index = i;
+					}
 				}
+
+				if (nearest == (uint64_t) -1) // Nothing else was found
+					break;
+
+				end = nearest;
+				res.emplace_back(std::string(string.begin() + start, string.begin() + end));
+				res.emplace_back(delimiters[index]);
+				start = end + 1;
 			}
 
-			if (nearest == (uint64_t) -1) // Nothing else was found
-				break;
+			res.emplace_back(std::string(string.begin() + start, string.end()));
 
-			end = nearest;
-			res.emplace_back(std::string(string.begin() + start, string.begin() + end));
-			res.emplace_back(delimiters[index]);
-			start = end + 1;
+			return res;
 		}
 
-		res.emplace_back(std::string(string.begin() + start, string.end()));
-
-		return res;
-	}
-
-	inline bool isalphanum(const std::string &string)
-	{
-		uint64_t i = 0;
-		for (const auto &c : string)
+		inline bool isalphanum(const std::string &string)
 		{
-			if (!((i == 0 && (c == '-' || c == '+') && string.length() > 1) || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c == '.')))
-				return false;
-			i++;
+			uint64_t i = 0;
+			for (const auto &c : string)
+			{
+				if (!((i == 0 && (c == '-' || c == '+') && string.length() > 1) || (c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c == '.')))
+					return false;
+				i++;
+			}
+			return true;
 		}
-		return true;
-	}
 
-	inline bool isalpha(const std::string &string)
-	{
-		for (const auto &c : string)
-			if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
-				return false;
-		return true;
-	}
-
-	inline bool isnum(const std::string &string)
-	{
-		uint64_t i = 0;
-		for (const auto &c : string)
+		inline bool isalpha(const std::string &string)
 		{
-			if (!((i == 0 && (c == '-' || c == '+') && string.length() > 1) || (c >= '0' && c <= '9') || (c == '.')))
-				return false;
-			i++;
+			for (const auto &c : string)
+				if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')))
+					return false;
+			return true;
 		}
-		return true;
+
+		inline bool isnum(const std::string &string)
+		{
+			uint64_t i = 0;
+			for (const auto &c : string)
+			{
+				if (!((i == 0 && (c == '-' || c == '+') && string.length() > 1) || (c >= '0' && c <= '9') || (c == '.')))
+					return false;
+				i++;
+			}
+			return true;
+		}
 	}
 }

@@ -146,25 +146,6 @@ std::string workingDirectory()
 #pragma comment(lib, "opengl32.lib")
 #endif
 
-namespace rapid
-{
-#ifdef RAPID_DEBUG
-#define rapidAssert(cond, err) { if (!(cond)) {rapid::RapidError("Assertion Failed", err).display(); }}
-
-#else
-#define rapidAssert(cond, err) cond
-#endif
-
-	inline void rapidValidate(bool condition, const std::string &err = "Error", const int code = 1)
-	{
-		if (!condition)
-		{
-			std::cerr << err << "\n";
-			exit(code);
-		}
-	}
-}
-
 //**************//
 // CURRENT TIME //
 //**************//

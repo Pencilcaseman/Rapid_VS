@@ -5,318 +5,239 @@
 
 namespace rapid
 {
-	class ExpressionSolver
+	namespace parser
 	{
-	public:
-		std::string expression;
-		std::vector<std::string> infix;
-		std::vector<std::string> postfix;
-		std::vector<std::pair<double, std::string>> processed;
-
-		// std::vector<std::string> splitBy = {" ", "(", ")", "+", "-", "*", "/", "^", "%"};
-		std::vector<std::string> splitBy = {" ", "(", ")", ">", "<", "=", "!", "+", "-", "*", "/", "^", "%"};
-		std::unordered_map<std::string, double> variables;
-
-		// Basic math operations
-		std::vector<std::string> operators = {"^", "*", "/", "%", "-", "+"};
-
-		// Functions and their definitions
-		std::vector<std::string> functionNames;
-		std::vector<std::function<double(double)>> functionDefinitions;
-
-		// Error tracking
-		bool errorOccured = false;
-
-	public:
-
-		ExpressionSolver() = default;
-
-		ExpressionSolver(const std::string &expr) : expression(expr)
+		class ExpressionSolver
 		{
-			operators.insert(operators.begin(), functionNames.begin(), functionNames.end());
+		public:
+			std::string expression;
+			std::vector<std::string> infix;
+			std::vector<std::string> postfix;
+			std::vector<std::pair<double, std::string>> processed;
 
-			// Register common functions
-			registerFunction("sin", [](double x)
-			{
-				return std::sin(x);
-			});
+			// std::vector<std::string> splitBy = {" ", "(", ")", "+", "-", "*", "/", "^", "%"};
+			std::vector<std::string> splitBy = {" ", "(", ")", ">", "<", "=", "!", "+", "-", "*", "/", "^", "%"};
+			std::unordered_map<std::string, double> variables;
 
-			registerFunction("cos", [](double x)
-			{
-				return std::cos(x);
-			});
+			// Basic math operations
+			std::vector<std::string> operators = {"^", "*", "/", "%", "-", "+"};
 
-			registerFunction("tan", [](double x)
-			{
-				return std::tan(x);
-			});
+			// Functions and their definitions
+			std::vector<std::string> functionNames;
+			std::vector<std::function<double(double)>> functionDefinitions;
 
-			registerFunction("asin", [](double x)
-			{
-				return std::asin(x);
-			});
+			// Error tracking
+			bool errorOccured = false;
 
-			registerFunction("acos", [](double x)
-			{
-				return std::acos(x);
-			});
+		public:
 
-			registerFunction("atan", [](double x)
-			{
-				return std::atan(x);
-			});
+			ExpressionSolver() = default;
 
-			registerFunction("exp", [](double x)
+			ExpressionSolver(const std::string &expr) : expression(expr)
 			{
-				return std::exp(x);
-			});
-		}
+				operators.insert(operators.begin(), functionNames.begin(), functionNames.end());
 
-		inline void expressionToInfix()
-		{
-			uint64_t i = 0;
-			bool append = false;
-			for (const auto &term : splitString(expression, splitBy))
-			{
-				if (term != " " && !term.empty())
+				// Register common functions
+				registerFunction("sin", [](double x)
 				{
-					if (!append)
-						infix.emplace_back(term);
-					else
+					return std::sin(x);
+				});
+
+				registerFunction("cos", [](double x)
+				{
+					return std::cos(x);
+				});
+
+				registerFunction("tan", [](double x)
+				{
+					return std::tan(x);
+				});
+
+				registerFunction("asin", [](double x)
+				{
+					return std::asin(x);
+				});
+
+				registerFunction("acos", [](double x)
+				{
+					return std::acos(x);
+				});
+
+				registerFunction("atan", [](double x)
+				{
+					return std::atan(x);
+				});
+
+				registerFunction("exp", [](double x)
+				{
+					return std::exp(x);
+				});
+			}
+
+			inline void expressionToInfix()
+			{
+				uint64_t i = 0;
+				bool append = false;
+				for (const auto &term : splitString(expression, splitBy))
+				{
+					if (term != " " && !term.empty())
 					{
-						infix[i - 1] += term;
-						append = false;
+						if (!append)
+							infix.emplace_back(term);
+						else
+						{
+							infix[i - 1] += term;
+							append = false;
+						}
+
+						if (i == 0 && (term == "+" || term == "-"))
+							append = true;
+						else if (i > 1 && (term == "+" || term == "-") && (std::find(operators.end() - 6, operators.end(), infix[infix.size() - 2]) != operators.end()))
+							append = true;
+
+						i++;
 					}
-
-					if (i == 0 && (term == "+" || term == "-"))
-						append = true;
-					else if (i > 1 && (term == "+" || term == "-") && (std::find(operators.end() - 6, operators.end(), infix[infix.size() - 2]) != operators.end()))
-						append = true;
-
-					i++;
 				}
 			}
-		}
 
-		inline void processInfix()
-		{
-			std::vector<std::string> newInfix;
-
-			for (uint64_t i = 0; i < infix.size(); i++)
+			inline void processInfix()
 			{
-				bool modified = false;
+				std::vector<std::string> newInfix;
 
-				if (infix[i] == ">")
+				for (uint64_t i = 0; i < infix.size(); i++)
 				{
-					if (i < infix.size() - 1 && infix[i + 1] == "=")
+					bool modified = false;
+
+					if (infix[i] == ">")
+					{
+						if (i < infix.size() - 1 && infix[i + 1] == "=")
+						{
+							newInfix.emplace_back(">=");
+							modified = true;
+							i++;
+						}
+						else
+						{
+							newInfix.emplace_back(">");
+							modified = true;
+						}
+					}
+
+					if (infix[i] == "<")
+					{
+						if (i < infix.size() - 1 && infix[i + 1] == "=")
+						{
+							newInfix.emplace_back("<=");
+							modified = true;
+							i++;
+						}
+						else
+						{
+							newInfix.emplace_back("<");
+							modified = true;
+						}
+					}
+
+					if (i < infix.size() - 1 && infix[i] == "!" && infix[i + 1] == "=")
 					{
 						newInfix.emplace_back(">=");
 						modified = true;
 						i++;
 					}
-					else
-					{
-						newInfix.emplace_back(">");
-						modified = true;
-					}
+
+					if (!modified)
+						newInfix.emplace_back(infix[i]);
 				}
 
-				if (infix[i] == "<")
-				{
-					if (i < infix.size() - 1&& infix[i + 1] == "=")
-					{
-						newInfix.emplace_back("<=");
-						modified = true;
-						i++;
-					}
-					else
-					{
-						newInfix.emplace_back("<");
-						modified = true;
-					}
-				}
-
-				if (i < infix.size() - 1 && infix[i] == "!" && infix[i + 1] == "=")
-				{
-					newInfix.emplace_back(">=");
-					modified = true;
-					i++;
-				}
-
-				if (!modified)
-					newInfix.emplace_back(infix[i]);
+				infix = newInfix;
 			}
 
-			infix = newInfix;
-		}
-
-		inline void infixToPostfix()
-		{
-			std::stack<std::string> stack;
-
-			for (const auto &token : infix)
+			inline void infixToPostfix()
 			{
-				auto it = std::find(functionNames.begin(), functionNames.end(), token);
+				std::stack<std::string> stack;
 
-				if (it == functionNames.end() && isalphanum(token))
-					postfix.emplace_back(token);
-				else if (token == "(" || token == "^")
-					stack.push(token);
-				else if (token == ")")
+				for (const auto &token : infix)
 				{
-					while (!stack.empty() && stack.top() != "(")
+					auto it = std::find(functionNames.begin(), functionNames.end(), token);
+
+					if (it == functionNames.end() && isalphanum(token))
+						postfix.emplace_back(token);
+					else if (token == "(" || token == "^")
+						stack.push(token);
+					else if (token == ")")
 					{
-						postfix.emplace_back(stack.top());
+						while (!stack.empty() && stack.top() != "(")
+						{
+							postfix.emplace_back(stack.top());
+							stack.pop();
+						}
 						stack.pop();
 					}
+					else
+					{
+						while (!stack.empty() && std::find(operators.begin(), operators.end(), token) >= std::find(operators.begin(), operators.end(), stack.top()))
+						{
+							postfix.emplace_back(stack.top());
+							stack.pop();
+						}
+						stack.push(token);
+					}
+				}
+
+				while (!stack.empty() > 0)
+				{
+					postfix.emplace_back(stack.top());
 					stack.pop();
 				}
-				else
-				{
-					while (!stack.empty() && std::find(operators.begin(), operators.end(), token) >= std::find(operators.begin(), operators.end(), stack.top()))
-					{
-						postfix.emplace_back(stack.top());
-						stack.pop();
-					}
-					stack.push(token);
-				}
 			}
 
-			while (!stack.empty() > 0)
+			inline void postfixProcess()
 			{
-				postfix.emplace_back(stack.top());
-				stack.pop();
-			}
-		}
-
-		inline void postfixProcess()
-		{
-			for (const auto &term : postfix)
-			{
-				if (isnum(term))
-					processed.emplace_back(std::make_pair(std::stod(term), ""));
-				else
-					processed.emplace_back(std::make_pair(0., term));
-			}
-		}
-
-		inline double postfixEval()
-		{
-			std::stack<double> stack;
-
-			for (const auto &term : processed)
-			{
-				bool evaluated = false;
-
-				if (term.second.length() == 0)
+				for (const auto &term : postfix)
 				{
-					stack.push(term.first);
-					evaluated = true;
-				}
-
-				if (!evaluated)
-				{
-					std::string varname;
-					double mult = 1;
-
-					if (term.second[0] == '-')
-					{
-						varname = std::string(term.second.begin() + 1, term.second.end());
-						mult = -1;
-					}
-					else if (term.second[0] == '+')
-					{
-						varname = std::string(term.second.begin() + 1, term.second.end());
-					}
+					if (isnum(term))
+						processed.emplace_back(std::make_pair(std::stod(term), ""));
 					else
-					{
-						varname = term.second;
-					}
+						processed.emplace_back(std::make_pair(0., term));
+				}
+			}
 
-					if (variables.find(varname) != variables.end())
+			inline double postfixEval()
+			{
+				std::stack<double> stack;
+
+				for (const auto &term : processed)
+				{
+					bool evaluated = false;
+
+					if (term.second.length() == 0)
 					{
-						stack.push(variables.at(varname) * mult);
+						stack.push(term.first);
 						evaluated = true;
 					}
-					else
+
+					if (!evaluated)
 					{
-						errorOccured = true;
-					}
-				}
+						std::string varname;
+						double mult = 1;
 
-				if (!evaluated)
-				{
-					double a = 0;
-					double b = stack.top(); stack.pop();
+						if (term.second[0] == '-')
+						{
+							varname = std::string(term.second.begin() + 1, term.second.end());
+							mult = -1;
+						}
+						else if (term.second[0] == '+')
+						{
+							varname = std::string(term.second.begin() + 1, term.second.end());
+						}
+						else
+						{
+							varname = term.second;
+						}
 
-					// Function
-					for (uint64_t i = 0; i < functionDefinitions.size(); i++)
-					{
-						if (term.second == functionNames[i])
+						if (variables.find(varname) != variables.end())
 						{
-							stack.push(functionDefinitions[i](b));
-							evaluated = true;
-							break;
-						}
-					}
-
-					if (!stack.empty() && !evaluated)
-					{
-						a = stack.top(); stack.pop();
-
-						if (term.second == "+")
-						{
-							stack.push(a + b);
-							evaluated = true;
-						}
-						else if (term.second == "-")
-						{
-							stack.push(a - b);
-							evaluated = true;
-						}
-						else if (term.second == "*")
-						{
-							stack.push(a * b);
-							evaluated = true;
-						}
-						else if (term.second == "/")
-						{
-							stack.push(a / b);
-							evaluated = true;
-						}
-						else if (term.second == "^")
-						{
-							stack.push(std::pow(a, b));
-							evaluated = true;
-						}
-						else if (term.second == "%")
-						{
-							stack.push(std::fmod(a, b));
-							evaluated = true;
-						}
-						else if (term.second == ">")
-						{
-							stack.push(a > b);
-							evaluated = true;
-						}
-						else if (term.second == "<")
-						{
-							stack.push(a < b);
-							evaluated = true;
-						}
-						else if (term.second == ">=")
-						{
-							stack.push(a >= b);
-							evaluated = true;
-						}
-						else if (term.second == "<=")
-						{
-							stack.push(a <= b);
-							evaluated = true;
-						}
-						else if (term.second == "!=")
-						{
-							stack.push(a != b);
+							stack.push(variables.at(varname) * mult);
 							evaluated = true;
 						}
 						else
@@ -324,37 +245,119 @@ namespace rapid
 							errorOccured = true;
 						}
 					}
+
+					if (!evaluated)
+					{
+						double a = 0;
+						double b = stack.top(); stack.pop();
+
+						// Function
+						for (uint64_t i = 0; i < functionDefinitions.size(); i++)
+						{
+							if (term.second == functionNames[i])
+							{
+								stack.push(functionDefinitions[i](b));
+								evaluated = true;
+								break;
+							}
+						}
+
+						if (!stack.empty() && !evaluated)
+						{
+							a = stack.top(); stack.pop();
+
+							if (term.second == "+")
+							{
+								stack.push(a + b);
+								evaluated = true;
+							}
+							else if (term.second == "-")
+							{
+								stack.push(a - b);
+								evaluated = true;
+							}
+							else if (term.second == "*")
+							{
+								stack.push(a * b);
+								evaluated = true;
+							}
+							else if (term.second == "/")
+							{
+								stack.push(a / b);
+								evaluated = true;
+							}
+							else if (term.second == "^")
+							{
+								stack.push(std::pow(a, b));
+								evaluated = true;
+							}
+							else if (term.second == "%")
+							{
+								stack.push(std::fmod(a, b));
+								evaluated = true;
+							}
+							else if (term.second == ">")
+							{
+								stack.push(a > b);
+								evaluated = true;
+							}
+							else if (term.second == "<")
+							{
+								stack.push(a < b);
+								evaluated = true;
+							}
+							else if (term.second == ">=")
+							{
+								stack.push(a >= b);
+								evaluated = true;
+							}
+							else if (term.second == "<=")
+							{
+								stack.push(a <= b);
+								evaluated = true;
+							}
+							else if (term.second == "!=")
+							{
+								stack.push(a != b);
+								evaluated = true;
+							}
+							else
+							{
+								errorOccured = true;
+							}
+						}
+					}
 				}
+
+				return stack.top();
 			}
 
-			return stack.top();
-		}
+			template<typename lambda>
+			inline void registerFunction(const std::string &name, const lambda &func)
+			{
+				functionNames.emplace_back(name);
+				functionDefinitions.emplace_back(std::function<double(double)>(func));
 
-		template<typename lambda>
-		inline void registerFunction(const std::string &name, const lambda &func)
-		{
-			functionNames.emplace_back(name);
-			functionDefinitions.emplace_back(std::function<double(double)>(func));
+				operators.insert(operators.begin(), name);
+			}
 
-			operators.insert(operators.begin(), name);
-		}
+			inline void compile()
+			{
+				expressionToInfix();
+				processInfix();
+				infixToPostfix();
+				postfixProcess();
+			}
 
-		inline void compile()
-		{
-			expressionToInfix();
-			processInfix();
-			infixToPostfix();
-			postfixProcess();
-		}
+			inline double eval()
+			{
+				return postfixEval();
+			}
 
-		inline double eval()
-		{
-			return postfixEval();
-		}
-
-		operator bool() const
-		{
-			return errorOccured;
-		}
-	};
+			operator bool() const
+			{
+				return errorOccured;
+			}
+		};
+	}
 }

@@ -8,30 +8,17 @@
 
 int main()
 {
-// 	def test(n) :
-// 		... : weight = np.ndarray(shape = (5, 5))
-// 		... : weight.fill(0.5)
-// 		... :
-// 		... : dw = np.ones_like(weight)
-// 		... :
-// 		... : first, config = optim.sgd(weight, dw)
-// 		... :
-// 		... : for i in range(n) :
-// 		... : first = optim.sgd(weight, dw, config)
-// 		... :
-// 		... : print(first, "\n\n")
-
-	auto weight = rapid::Array<double>({5, 5});
+	auto weight = rapid::ndarray::Array<double>({5, 5});
 	weight.fill(0.5);
 
-	auto dw = rapid::onesLike(weight);
+	auto dw = rapid::ndarray::onesLike(weight);
 
-	auto config = rapid::optim::newConfig<double>();
-	auto res = rapid::optim::adam(weight, dw, config);
+	auto config = rapid::network::optim::newConfig<double>();
+	auto res = rapid::network::optim::adam(weight, dw, config);
 
 	for (int i = 0; i < 5; i++)
 	{
-		auto newRes = rapid::optim::adam(weight, dw, config);
+		auto newRes = rapid::network::optim::adam(weight, dw, config);
 		std::cout << newRes.weight.toString() << "\n\n";
 	}
 

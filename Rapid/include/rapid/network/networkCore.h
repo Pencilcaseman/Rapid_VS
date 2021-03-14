@@ -6,22 +6,25 @@
 
 namespace rapid
 {
-	template<typename t>
-	std::vector<Array<t>> toCategorical(const std::vector<size_t> &data, size_t numClasses)
+	namespace network
 	{
-		Array<t> res({data.size(), numClasses, 1});
-		uint64_t index = 0;
-		for (const auto &val : data)
+		template<typename t>
+		std::vector<ndarray::Array<t>> toCategorical(const std::vector<size_t> &data, size_t numClasses)
 		{
-			rapidAssert(val < numClasses, "Class exceeds number of classes specified");
+			ndarray::Array<t> res({data.size(), numClasses, 1});
+			uint64_t index = 0;
+			for (const auto &val : data)
+			{
+				rapidAssert(val < numClasses, "Class exceeds number of classes specified");
 
-			auto tmp = Array<t>({numClasses, 1});
-			tmp.fill(0);
-			tmp.setVal({val, 0}, 1);
+				auto tmp = ndarray::Array<t>({numClasses, 1});
+				tmp.fill(0);
+				tmp.setVal({val, 0}, 1);
 
-			res[index++] = tmp;
+				res[index++] = tmp;
+			}
+
+			return res;
 		}
-
-		return res;
-	}	
+	}
 }

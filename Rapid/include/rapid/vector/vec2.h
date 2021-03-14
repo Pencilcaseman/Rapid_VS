@@ -4,125 +4,128 @@
 
 namespace rapid
 {
-	template<typename vecType>
-	class Vec2
+	namespace vector
 	{
-	public:
-		vecType x{};
-		vecType y{};
-
-		Vec2() = default;
-
-		Vec2(const vecType xx, const vecType yy) : x(xx), y(yy)
-		{}
-
-		inline Vec2 operator+(const Vec2 &other) const
+		template<typename vecType>
+		class Vec2
 		{
-			return {x + other.x, y + other.y};
-		}
+		public:
+			vecType x{};
+			vecType y{};
 
-		inline Vec2 operator-(const Vec2 &other) const
-		{
-			return {x - other.x, y - other.y};
-		}
+			Vec2() = default;
 
-		inline Vec2 operator*(const Vec2 &other) const
-		{
-			return {x * other.x, y * other.y};
-		}
+			Vec2(const vecType xx, const vecType yy) : x(xx), y(yy)
+			{}
 
-		inline Vec2 operator/(const Vec2 &other) const
-		{
-			return {x / other.x, y / other.y};
-		}
+			inline Vec2 operator+(const Vec2 &other) const
+			{
+				return {x + other.x, y + other.y};
+			}
 
-		inline Vec2 operator+(const vecType &other) const
-		{
-			return {x + other, y + other};
-		}
+			inline Vec2 operator-(const Vec2 &other) const
+			{
+				return {x - other.x, y - other.y};
+			}
 
-		inline Vec2 operator-(const vecType &other) const
-		{
-			return {x - other, y - other};
-		}
+			inline Vec2 operator*(const Vec2 &other) const
+			{
+				return {x * other.x, y * other.y};
+			}
 
-		inline Vec2 operator*(const vecType &other) const
-		{
-			return {x * other, y * other};
-		}
+			inline Vec2 operator/(const Vec2 &other) const
+			{
+				return {x / other.x, y / other.y};
+			}
 
-		inline Vec2 operator/(const vecType &other) const
-		{
-			return {x / other, y / other};
-		}
+			inline Vec2 operator+(const vecType &other) const
+			{
+				return {x + other, y + other};
+			}
+
+			inline Vec2 operator-(const vecType &other) const
+			{
+				return {x - other, y - other};
+			}
+
+			inline Vec2 operator*(const vecType &other) const
+			{
+				return {x * other, y * other};
+			}
+
+			inline Vec2 operator/(const vecType &other) const
+			{
+				return {x / other, y / other};
+			}
 
 
-		inline void operator+=(const Vec2 &other)
-		{
-			x += other.x;
-			y += other.y;
-		}
+			inline void operator+=(const Vec2 &other)
+			{
+				x += other.x;
+				y += other.y;
+			}
 
-		inline void operator-=(const Vec2 &other)
-		{
-			x -= other .x;
-			y -= other.y;
-		}
+			inline void operator-=(const Vec2 &other)
+			{
+				x -= other.x;
+				y -= other.y;
+			}
 
-		inline void operator*=(const Vec2 &other)
-		{
-			x *= other.x;
-			y *= other.y;
-		}
+			inline void operator*=(const Vec2 &other)
+			{
+				x *= other.x;
+				y *= other.y;
+			}
 
-		inline void operator/=(const Vec2 &other)
-		{
-			x /= other.x;
-			y /= other.y;
-		}
+			inline void operator/=(const Vec2 &other)
+			{
+				x /= other.x;
+				y /= other.y;
+			}
 
-		inline void operator+=(const vecType &other)
-		{
-			x += other;
-			y += other;
-		}
+			inline void operator+=(const vecType &other)
+			{
+				x += other;
+				y += other;
+			}
 
-		inline void operator-=(const vecType &other)
-		{
-			x -= other;
-			y -= other;
-		}
+			inline void operator-=(const vecType &other)
+			{
+				x -= other;
+				y -= other;
+			}
 
-		inline void operator*=(const vecType &other)
-		{
-			x *= other;
-			y *= other;
-		}
+			inline void operator*=(const vecType &other)
+			{
+				x *= other;
+				y *= other;
+			}
 
-		inline void operator/=(const vecType &other)
-		{
-			x /= other;
-			y /= other;
-		}
+			inline void operator/=(const vecType &other)
+			{
+				x /= other;
+				y /= other;
+			}
 
-		inline vecType mag() const
-		{
-			return sqrt(x * x + y * y);
-		}
+			inline vecType mag() const
+			{
+				return sqrt(x * x + y * y);
+			}
 
-		inline vecType magSquared() const
-		{
-			return x * x + y * y;
-		}
+			inline vecType magSquared() const
+			{
+				return x * x + y * y;
+			}
 
-		inline Vec2 yx() const
-		{
-			return {y, x};
-		}
+			inline Vec2 yx() const
+			{
+				return {y, x};
+			}
 
-		std::string toString() const
-		{
-			return "Vec2(X: " + std::to_string(x) + ", Y: " + std::to_string(y) + ")";
-		}
-	};
+			std::string toString() const
+			{
+				return "Vec2(X: " + std::to_string(x) + ", Y: " + std::to_string(y) + ")";
+			}
+		};
+	}
 }
