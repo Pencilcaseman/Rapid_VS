@@ -139,7 +139,7 @@ namespace rapid
 		}
 
 		template<typename t>
-		std::string Array<t>::toString() const
+		std::string Array<t>::toString(uint64_t startDepth) const
 		{
 			if (isZeroDim)
 				return std::to_string(dataStart[0]);
@@ -204,7 +204,7 @@ namespace rapid
 				adjusted[i] = tmp;
 			}
 
-			auto res = utils::toString(adjusted, shape, 1, stripMiddle);
+			auto res = utils::toString(adjusted, shape, 1 + startDepth, stripMiddle);
 
 			return res;
 		}

@@ -747,6 +747,18 @@ namespace rapid
 				dataStart[utils::ndToScalar(index, shape)] = val;
 			}
 
+			inline Array<arrayType> operator-() const
+			{
+				auto res = Array<arrayType>(shape);
+				Array<arrayType>::unaryOpArray(*this, res,
+													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 [](arrayType x)
+				{
+					return -x;
+				});
+				return res;
+			}
+
 			/// <summary>
 			/// Array add Array
 			/// </summary>
@@ -1337,9 +1349,6 @@ namespace rapid
 			/// <returns></returns>
 			inline Array<arrayType> resized(const std::vector<uint64_t> &newShape) const
 			{
-				if (prod(newShape) != prod(shape))
-					message::RapidError("Invalid Shape", "Invalid reshape size. Number of elements differ").display();
-
 				auto tmpNewShape = std::vector<uint64_t>(newShape.size(), 1);
 				uint64_t undefined = -1;
 
@@ -1360,6 +1369,9 @@ namespace rapid
 
 				if (undefined != AUTO)
 					tmpNewShape[undefined] = prod(shape) / prod(tmpNewShape);
+
+				if (prod(tmpNewShape) != prod(shape))
+					message::RapidError("Invalid Shape", "Invalid reshape size. Number of elements differ").display();
 
 				bool zeroDim = false;
 
@@ -1380,9 +1392,6 @@ namespace rapid
 			/// <param name="newShape"></param>
 			inline void resize(const std::vector<uint64_t> &newShape)
 			{
-				if (prod(newShape) != prod(shape))
-					message::RapidError("Invalid Shape", "Invalid reshape size. Number of elements differ").display();
-
 				auto tmpNewShape = std::vector<uint64_t>(newShape.size(), 1);
 				uint64_t undefined = -1;
 
@@ -1403,6 +1412,9 @@ namespace rapid
 
 				if (undefined != AUTO)
 					tmpNewShape[undefined] = prod(shape) / prod(tmpNewShape);
+
+				if (prod(tmpNewShape) != prod(shape))
+					message::RapidError("Invalid Shape", "Invalid reshape size. Number of elements differ").display();
 
 				if (isZeroDim && tmpNewShape.size() == 1)
 					isZeroDim = true;
@@ -1449,8 +1461,14 @@ namespace rapid
 			/// </summary>
 			/// <typeparam name="t"></typeparam>
 			/// <returns></returns>
-			std::string toString() const;
+			std::string toString(uint64_t startDepth = 0) const;
 		};
+
+		template<typename t>
+		std::ostream &operator<<(std::ostream &os, const Array<t> &arr)
+		{
+			return os << arr.toString();
+		}
 
 		/// <summary>
 		/// Create a new array of the same size and dimensions as
@@ -1699,6 +1717,87 @@ namespace rapid
 			});
 
 			return result;
+		}
+
+		template<typename t>
+		inline Array<t> sin(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::sin(val);
+			});
+		}
+
+		template<typename t>
+		inline Array<t> cos(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::cos(val);
+			});
+		}
+
+		template<typename t>
+		inline Array<t> tan(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::tan(val);
+			});
+		}
+
+		template<typename t>
+		inline Array<t> asin(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::asin(val);
+			});
+		}
+
+		template<typename t>
+		inline Array<t> acos(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::acos(val);
+			});
+		}
+
+		template<typename t>
+		inline Array<t> atan(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::atan(val);
+			});
+		}
+
+		template<typename t>
+		inline Array<t> sinh(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::sinh(val);
+			});
+		}
+
+		template<typename t>
+		inline Array<t> cosh(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::cosh(val);
+			});
+		}
+
+		template<typename t>
+		inline Array<t> tanh(const Array<t> &arr)
+		{
+			return arr.mapped([](t val)
+			{
+				return std::tanh(val);
+			});
 		}
 
 		/// <summary>

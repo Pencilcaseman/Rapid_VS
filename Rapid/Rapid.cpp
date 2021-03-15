@@ -8,23 +8,23 @@
 
 int main()
 {
-	auto weight = rapid::ndarray::Array<double>({5, 5});
-	weight.fill(0.5);
+	auto w = rapid::ndarray::Array<double>({5, 5});
+	auto dw = rapid::ndarray::onesLike(w);
+	w.fill(0.5);
+	auto optimizer = std::make_shared<rapid::network::optim::adam<double>>();
+	
+	auto res = optimizer->apply(w, dw);
+	w.set(res.weight);
+	rapid::network::optim::Config<double> config = res.config;
 
-	auto dw = rapid::ndarray::onesLike(weight);
-
-	auto config = rapid::network::optim::newConfig<double>();
-	auto res = rapid::network::optim::adam(weight, dw, config);
-
+	std::cout << w.toString() << "\n\n";
 	for (int i = 0; i < 5; i++)
 	{
-		auto newRes = rapid::network::optim::adam(weight, dw, config);
-		std::cout << newRes.weight.toString() << "\n\n";
+		res = optimizer->apply(w, dw, config);
+		w.set(res.weight);
+		config = res.config;
+		std::cout << w.toString() << "\n\n";
 	}
-
-	auto testArr = rapid::ndarray::Array<double>::fromData({1, 2, 3, 4, 5, 6});
-	std::cout << testArr.toString() << "\n";
-	std::cout << testArr.resized({6, AUTO}).toString() << "\n";
 
 	return 0;
 }
