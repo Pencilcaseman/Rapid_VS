@@ -21,7 +21,7 @@ namespace rapid
 									const double *__restrict a,
 									const double *__restrict b)
 			{
-				return cblas_ddot(len, a, 1, b, 1);
+				return cblas_ddot((blasint) len, a, (blasint) 1, b, (blasint) 1);
 			}
 
 			template<>
@@ -29,7 +29,7 @@ namespace rapid
 								   const float *__restrict a,
 								   const float *__restrict b)
 			{
-				return cblas_sdot(len, a, 1, b, 1);
+				return cblas_sdot((blasint) len, a, (blasint) 1, b, (blasint) 1);
 			}
 
 			template<typename t>
@@ -47,7 +47,8 @@ namespace rapid
 								   const double *__restrict b,
 								   double *__restrict c)
 			{
-				cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, K, N, 1., a, N, b, K, 0., c, K);
+				cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (blasint) M, (blasint) K, (blasint) N,
+							1., a, (blasint) N, b, (blasint) K, 0., c, (blasint) K);
 			}
 
 			template<>
@@ -56,7 +57,7 @@ namespace rapid
 								   const float *__restrict b,
 								   float *__restrict c)
 			{
-				cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, K, N, 1., a, N, b, K, 0., c, K);
+				cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, (blasint) M, (blasint) K, (blasint) N, 1., a, (blasint) N, b, (blasint) K, 0., c, (blasint) K);
 			}
 		}
 	}

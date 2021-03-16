@@ -10,7 +10,7 @@ namespace rapid
 	#define rapidAssert(cond, err) { if (!(cond)) {rapid::message::RapidError("Assertion Failed", err).display(); }}
 
 	#else
-	#define rapidAssert(cond, err) cond
+	#define rapidAssert(cond, err)
 	#endif
 
 		inline void rapidValidate(bool condition, const std::string &err = "Error", const int code = 1)
@@ -144,7 +144,7 @@ namespace rapid
 				std::wstring wideTitle;
 				wideTitle.assign(title.begin(), title.end());
 
-			#ifdef __CUDA_ARCH__
+			#ifdef __CUDACC_VER__
 				int msgBoxID = MessageBox(
 					nullptr,
 					(LPCSTR) wideMessage.c_str(),
@@ -380,7 +380,7 @@ namespace rapid
 				auto titleLen = title.length();
 				auto msgLen = message.length();
 
-				auto maxLen = rapid::min(rapid::max(titleLen, msgLen), 50);
+				auto maxLen = rapid::math::min(rapid::math::max(titleLen, msgLen), 50);
 
 				std::cout << "\n\n" << std::string(maxLen + 4, '=') << "\n";
 
@@ -428,7 +428,7 @@ namespace rapid
 				std::cout << std::string(maxLen + 4, '=') << "\n";
 
 				std::cout << "Press enter to accept";
-				std::getchar();
+				auto res = std::getchar();
 
 				pressOk();
 

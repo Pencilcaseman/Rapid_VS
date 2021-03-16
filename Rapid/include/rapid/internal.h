@@ -33,8 +33,108 @@
 
 #include <omp.h>
 
+#ifndef RAPID_CUDA
+#ifdef CUDA_VERSION 
+#define RAPID_CUDA
+#else
+#define RAPID_CPP
+#endif
+#endif
+
+#ifdef RAPID_CUDA
+#include <cuda.h>
+#include <cublas_v2.h>
+#include <curand.h>
+#include <curand_kernel.h>
+
+// cuBLAS API errors
+static const char *HIDDEN_cudaGetErrorEnum(cublasStatus_t error)
+{
+	switch (error)
+	{
+		case CUBLAS_STATUS_SUCCESS:
+			return "CUBLAS_STATUS_SUCCESS";
+		case CUBLAS_STATUS_NOT_INITIALIZED:
+			return "CUBLAS_STATUS_NOT_INITIALIZED";
+		case CUBLAS_STATUS_ALLOC_FAILED:
+			return "CUBLAS_STATUS_ALLOC_FAILED";
+		case CUBLAS_STATUS_INVALID_VALUE:
+			return "CUBLAS_STATUS_INVALID_VALUE";
+		case CUBLAS_STATUS_ARCH_MISMATCH:
+			return "CUBLAS_STATUS_ARCH_MISMATCH";
+		case CUBLAS_STATUS_MAPPING_ERROR:
+			return "CUBLAS_STATUS_MAPPING_ERROR";
+		case CUBLAS_STATUS_EXECUTION_FAILED:
+			return "CUBLAS_STATUS_EXECUTION_FAILED";
+		case CUBLAS_STATUS_INTERNAL_ERROR:
+			return "CUBLAS_STATUS_INTERNAL_ERROR";
+		case CUBLAS_STATUS_NOT_SUPPORTED:
+			return "CUBLAS_STATUS_NOT_SUPPORTED";
+		case CUBLAS_STATUS_LICENSE_ERROR:
+			return "CUBLAS_STATUS_LICENSE_ERROR";
+	}
+
+	return "UNKNOWN ERROR";
+}
+
+//********************//
+// cuBLAS ERROR CHECK //
+//********************//
+#ifndef cublasSafeCall
+#ifdef RAPID_DEBUG
+#define cublasSafeCall(err) HIDDEN_cublasSafeCall(err, __FILE__, __LINE__)
+#else
+#define cublasSafeCall(err) err
+#endif
+#endif
+
+inline void HIDDEN_cublasSafeCall(cublasStatus_t err, const char *file, const int line)
+{
+	if (CUBLAS_STATUS_SUCCESS != err)
+	{
+		fprintf(stderr, "cuBLAS error in file '%s', line %d\n \nError: %s \nTERMINATING\n", file, line, HIDDEN_cudaGetErrorEnum(err));
+		cudaDeviceReset();
+		assert(0);
+		exit(1);
+	}
+}
+
+//********************//
+// CUDA ERROR CHECK //
+//********************//
+#ifndef cudaSafeCall
+#ifdef RAPID_DEBUG
+#define cudaSafeCall(err) HIDDEN_cudaSafeCall(err, __FILE__, __LINE__)
+#else
+#define cudaSafeCall(err) err
+#endif
+#endif
+
+inline void HIDDEN_cudaSafeCall(cudaError_t err, const char *file, const int line)
+{
+	if (cudaSuccess != err)
+	{
+		fprintf(stderr, "CUDA error in file '%s', line %d\n \nError: %s \nTERMINATING\n", file, line, cudaGetErrorString(err));
+		cudaDeviceReset();
+		assert(0);
+		exit(1);
+	}
+}
+#else
+#define cudaSafeCall(func)
+#define cublasSafeCall(func)
+#endif
+
+#ifdef RAPID_CPP
 #ifndef RAPID_NO_AMP
 #include <amp.h>		// Optional AMP include
+#endif
+#else
+#ifdef _MSC_VER
+#pragma message ("AMP cannot be used in CUDA mode")
+#else
+#warning AMP cannot be used in CUDA mode
+#endif
 #endif
 
 #ifndef RAPID_NO_BLAS
@@ -130,7 +230,13 @@
 std::string workingDirectory()
 {
 	char buff[255];
-	_getcwd(buff, 255);
+	char *res = _getcwd(buff, 255);
+	
+#ifdef RAPID_DEBUG
+	if (res == nullptr)
+		throw std::runtime_error("Unable to fetch working directory");
+#endif
+
 	std::string current_working_dir(buff);
 
 	return current_working_dir;

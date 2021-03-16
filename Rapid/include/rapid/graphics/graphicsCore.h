@@ -7,6 +7,7 @@
 #include "glew/include/GL/glew.h"
 #include "GLFW/glfw3.h"
 #include "../math.h"
+#include "../messageBox.h"
 
 namespace rapid
 {
@@ -25,7 +26,7 @@ namespace rapid
 			POLL = 0, WAIT = 1, TIMEOUT = 2
 		};
 
-		enum shapeTypes
+		enum class ShapeType
 		{
 			TRIANGLES = GL_TRIANGLES,
 			TRIANGLE_STRIP = GL_TRIANGLE_STRIP,
@@ -36,7 +37,7 @@ namespace rapid
 			POLYGON = GL_POLYGON
 		};
 
-		enum keyType
+		enum class KeyType
 		{
 			KEY_SPACE = GLFW_KEY_SPACE,
 			KEY_APOSTROPHE = GLFW_KEY_APOSTROPHE,
@@ -158,13 +159,13 @@ namespace rapid
 			KEY_MENU = GLFW_KEY_MENU
 		};
 
-		enum keyAction
+		enum class KeyAction
 		{
 			ACTION_PRESS = GLFW_PRESS,
 			ACTION_RELEASE = GLFW_RELEASE
 		};
 
-		enum keyModifier
+		enum class KeyModifier
 		{
 			MODIFIER_ALT = GLFW_MOD_ALT,
 			MODIFIER_CAPS = GLFW_MOD_CAPS_LOCK,
@@ -175,9 +176,9 @@ namespace rapid
 
 		struct KeyDefinition
 		{
-			keyType key;
-			keyAction action;
-			std::vector<keyModifier> mod;
+			KeyType key;
+			KeyAction action;
+			std::vector<KeyModifier> mod;
 		};
 
 		class RapidGraphics
@@ -244,7 +245,7 @@ namespace rapid
 
 			bool initialize()
 			{
-				rapidValidate(glfwInit(), "Unable to initialize GLFW");
+				message::rapidValidate(glfwInit(), "Unable to initialize GLFW");
 
 				glfwWindowHint(GLFW_RESIZABLE, GL_FALSE);
 
@@ -261,7 +262,7 @@ namespace rapid
 				glfwMakeContextCurrent(window);
 				glfwSwapInterval(0);
 
-				rapidValidate(glewInit() == GLEW_OK, "Unable to initialize glew");
+				message::rapidValidate(glewInit() == GLEW_OK, "Unable to initialize glew");
 
 				if (!setup())
 				{
@@ -311,7 +312,7 @@ namespace rapid
 						glfwWaitEventsTimeout(1. / targetFrameRate);
 						break;
 					default:
-						rapidValidate(false, "Invalid poll method");
+						message::rapidValidate(false, "Invalid poll method");
 						break;
 				}
 
@@ -390,7 +391,7 @@ namespace rapid
 				return true;
 			}
 
-			inline virtual bool onKeyPress(keyType key, keyAction action, const std::vector<keyModifier> &mods)
+			inline virtual bool onKeyPress(KeyType key, KeyAction action, const std::vector<KeyModifier> &mods)
 			{
 				return true;
 			}
@@ -420,9 +421,9 @@ namespace rapid
 				return glfwGetWindowAttrib(window, GLFW_FOCUSED);
 			}
 
-			inline bool isPressed(keyType key) const
+			inline bool isPressed(KeyType key) const
 			{
-				return glfwGetKey(window, key) == ACTION_PRESS;
+				return glfwGetKey(window, (int) key) == (int) KeyAction::ACTION_PRESS;
 			}
 
 			inline double frameRate() const
@@ -531,19 +532,19 @@ namespace rapid
 				glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 			}
 
-			inline void begin(const shapeTypes mode)
+			inline void begin(const ShapeType &mode)
 			{
-				rapidValidate(!shapeStarted, "Cannot start a new shape because there is an unfinished one already created");
+				message::rapidValidate(!shapeStarted, "Cannot start a new shape because there is an unfinished one already created");
 
 				shapeStarted = true;
 				shapeEnded = false;
 
-				glBegin(mode);
+				glBegin((int) mode);
 			}
 
 			inline void end()
 			{
-				rapidValidate(!shapeEnded, "Cannot end a shape because nothing was started");
+				message::rapidValidate(!shapeEnded, "Cannot end a shape because nothing was started");
 
 				shapeStarted = false;
 				shapeEnded = true;
@@ -563,17 +564,17 @@ namespace rapid
 
 				double screenSpaceX1, screenSpaceX2, screenSpaceX3, screenSpaceY1, screenSpaceY2, screenSpaceY3;
 
-				screenSpaceX1 = map(x1, 0, width, -1, 1);
-				screenSpaceX2 = map(x2, 0, width, -1, 1);
-				screenSpaceX3 = map(x3, 0, width, -1, 1);
-				screenSpaceY1 = map(y1, 0, height, 1, -1);
-				screenSpaceY2 = map(y2, 0, height, 1, -1);
-				screenSpaceY3 = map(y3, 0, height, 1, -1);
+				screenSpaceX1 = math::map(x1, 0, width, -1, 1);
+				screenSpaceX2 = math::map(x2, 0, width, -1, 1);
+				screenSpaceX3 = math::map(x3, 0, width, -1, 1);
+				screenSpaceY1 = math::map(y1, 0, height, 1, -1);
+				screenSpaceY2 = math::map(y2, 0, height, 1, -1);
+				screenSpaceY3 = math::map(y3, 0, height, 1, -1);
 
 				if (!shapeStarted)
 					glBegin(GL_TRIANGLES);
 				else
-					RapidError("Graphics Error", "'begin' has already been called. Call 'end' before drawing a triangle");
+					message::RapidError("Graphics Error", "'begin' has already been called. Call 'end' before drawing a triangle").display();
 
 				glVertex2d(screenSpaceX1, screenSpaceY1);
 				glVertex2d(screenSpaceX2, screenSpaceY2);
@@ -581,7 +582,7 @@ namespace rapid
 
 				glEnd();
 
-				glLineWidth(strokeWeightVal);
+				glLineWidth((GLfloat) strokeWeightVal);
 				glColor3ub(strokeR, strokeG, strokeB);
 
 				// P1 to P2
@@ -607,7 +608,7 @@ namespace rapid
 
 				glColor3ub(strokeR, strokeG, strokeB);
 
-				glLineWidth(strokeWeightVal);
+				glLineWidth((GLfloat) strokeWeightVal);
 
 				// Top
 				line(x, y, x + w, y);
@@ -628,13 +629,13 @@ namespace rapid
 
 				if (strokeWeightVal != 0)
 				{
-					glLineWidth(strokeWeightVal);
+					glLineWidth((GLfloat) strokeWeightVal);
 
-					double screenSpaceX1 = map(x1, 0, width, -1, 1);
-					double screenSpaceY1 = map(y1, 0, height, 1, -1);
+					double screenSpaceX1 = math::map(x1, 0, width, -1, 1);
+					double screenSpaceY1 = math::map(y1, 0, height, 1, -1);
 
-					double screenSpaceX2 = map(x2, 0, width, -1, 1);
-					double screenSpaceY2 = map(y2, 0, height, 1, -1);
+					double screenSpaceX2 = math::map(x2, 0, width, -1, 1);
+					double screenSpaceY2 = math::map(y2, 0, height, 1, -1);
 
 					glBegin(GL_LINES);
 
@@ -649,11 +650,11 @@ namespace rapid
 			{
 				double screenSpaceX, screenSpaceY;
 
-				glPointSize(strokeWeightVal);
+				glPointSize((GLfloat) strokeWeightVal);
 				glColor3ub(strokeR, strokeG, strokeB);
 
-				screenSpaceX = map(x, 0, width, -1, 1);
-				screenSpaceY = map(y, 0, height, 1, -1);
+				screenSpaceX = math::map(x, 0, width, -1, 1);
+				screenSpaceY = math::map(y, 0, height, 1, -1);
 
 				if (!shapeStarted)
 					glBegin(GL_POINTS);
@@ -669,8 +670,8 @@ namespace rapid
 			{
 				double screenSpaceX, screenSpaceY;
 
-				screenSpaceX = map((double) x, 0, width, -1, 1);
-				screenSpaceY = map((double) y, 0, height, 1, -1);
+				screenSpaceX = math::map((double) x, 0, width, -1, 1);
+				screenSpaceY = math::map((double) y, 0, height, 1, -1);
 
 				glColor3ub(fillR, fillG, fillB);
 
@@ -694,21 +695,21 @@ namespace rapid
 			{
 				if (window->callbackWhenNotFocused || window_ == window->internal_window_())
 				{
-					auto mods_ = std::vector<keyModifier>();
-					if (mods & MODIFIER_ALT)
-						mods_.emplace_back(MODIFIER_ALT);
-					if (mods & MODIFIER_CAPS)
-						mods_.emplace_back(MODIFIER_CAPS);
-					if (mods & MODIFIER_CONTROL)
-						mods_.emplace_back(MODIFIER_CONTROL);
-					if (mods & MODIFIER_NUM_LOCK)
-						mods_.emplace_back(MODIFIER_NUM_LOCK);
-					if (mods & MODIFIER_SHIFT)
-						mods_.emplace_back(MODIFIER_SHIFT);
+					auto mods_ = std::vector<KeyModifier>();
+					if (mods & (uint64_t) KeyModifier::MODIFIER_ALT)
+						mods_.emplace_back(KeyModifier::MODIFIER_ALT);
+					if (mods & (uint64_t) KeyModifier::MODIFIER_CAPS)
+						mods_.emplace_back(KeyModifier::MODIFIER_CAPS);
+					if (mods & (uint64_t) KeyModifier::MODIFIER_CONTROL)
+						mods_.emplace_back(KeyModifier::MODIFIER_CONTROL);
+					if (mods & (uint64_t) KeyModifier::MODIFIER_NUM_LOCK)
+						mods_.emplace_back(KeyModifier::MODIFIER_NUM_LOCK);
+					if (mods & (uint64_t) KeyModifier::MODIFIER_SHIFT)
+						mods_.emplace_back(KeyModifier::MODIFIER_SHIFT);
 
 					window->internal_keyDef = {
-							(keyType) key,
-							(keyAction) action,
+							(KeyType) key,
+							(KeyAction) action,
 							mods_
 					};
 					window->keyDefSet = true;

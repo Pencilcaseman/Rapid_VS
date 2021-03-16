@@ -264,7 +264,7 @@ namespace rapid
 				return true;
 			}
 
-			inline virtual bool onKeyPress(keyType key, keyAction action, const std::vector<keyModifier> &mods)
+			inline virtual bool onKeyPress(KeyType key, KeyAction action, const std::vector<KeyModifier> &mods)
 			{
 				return true;
 			}
@@ -294,7 +294,7 @@ namespace rapid
 				return glfwGetWindowAttrib(window, GLFW_FOCUSED);
 			}
 
-			inline bool isPressed(keyType key) const
+			inline bool isPressed(KeyType key) const
 			{
 				return glfwGetKey(window, key) == ACTION_PRESS;
 			}

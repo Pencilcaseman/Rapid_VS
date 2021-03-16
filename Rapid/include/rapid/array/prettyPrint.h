@@ -82,7 +82,7 @@ namespace rapid
 				{
 					std::string res = "[";
 					size_t count = 0;
-					size_t inc = prod(shape) / shape[0];
+					size_t inc = math::prod(shape) / shape[0];
 
 					for (size_t i = 0; i < adjusted.size(); i += inc)
 					{
@@ -119,7 +119,6 @@ namespace rapid
 			inline bool incArr(std::vector<uint64_t> &arr, const std::vector<uint64_t> &m)
 			{
 				arr[arr.size() - 1]++;
-				uint64_t lastChanged = 0;
 
 				for (uint64_t i = 0; i < arr.size(); i++)
 				{
@@ -130,7 +129,6 @@ namespace rapid
 
 						arr[arr.size() - i - 2]++;
 						arr[arr.size() - i - 1] = 0;
-						lastChanged = i;
 					}
 				}
 
@@ -138,21 +136,19 @@ namespace rapid
 			}
 		}
 
-		template<typename t>
-		std::string Array<t>::toString(uint64_t startDepth) const
+		template<typename t, ArrayLocation loc>
+		std::string Array<t, loc>::toString(uint64_t startDepth) const
 		{
 			if (isZeroDim)
 				return std::to_string(dataStart[0]);
 
-			size_t allocate = 1;
-
-			std::vector<utils::strContainer> formatted(prod(shape), {"", 0});
+			std::vector<utils::strContainer> formatted(math::prod(shape), {"", 0});
 			size_t longestIntegral = 0;
 			size_t longestDecimal = 0;
 
 			// General checks
 			bool stripMiddle = false;
-			if (prod(shape) > 1000)
+			if (math::prod(shape) > 1000)
 				stripMiddle = true;
 
 			// Edge case
@@ -160,7 +156,18 @@ namespace rapid
 				stripMiddle = false;
 
 			std::vector<uint64_t> currentIndex(shape.size(), 0);
-			currentIndex[currentIndex.size() - 1] = -1;
+			currentIndex[currentIndex.size() - 1] = (uint64_t) -1;
+
+			t *arrayData;
+			if (loc == CPU)
+			{
+				arrayData = dataStart;
+			}
+			else
+			{
+				arrayData = new t[math::prod(shape)];
+				cudaSafeCall(cudaMemcpy(arrayData, dataStart, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
+			}
 
 			while (utils::incArr(currentIndex, shape))
 			{
@@ -177,7 +184,7 @@ namespace rapid
 
 				if (!skip)
 				{
-					formatted[index] = utils::formatNumerical(dataStart[index]);
+					formatted[index] = utils::formatNumerical(arrayData[index]);
 
 					if (formatted[index].decimalPoint > longestIntegral)
 						longestIntegral = formatted[index].decimalPoint;
@@ -187,6 +194,9 @@ namespace rapid
 						longestDecimal = formatted[index].str.length() - formatted[index].decimalPoint;
 				}
 			}
+			
+			if (loc == GPU)
+				delete[] arrayData;
 
 			std::vector<std::string> adjusted(formatted.size(), "");
 
@@ -197,8 +207,6 @@ namespace rapid
 
 				const auto &term = formatted[i];
 				auto decimal = term.str.length() - term.decimalPoint - 1;
-
-				size_t bufferLeft = 0;
 
 				auto tmp = std::string(longestIntegral - term.decimalPoint, ' ') + term.str + std::string(longestDecimal - decimal, ' ');
 				adjusted[i] = tmp;

@@ -16,7 +16,7 @@ namespace rapid
 			while (end != std::string::npos)
 			{
 				// Find the nearest delimiter
-				uint64_t nearest = -1;
+				uint64_t nearest = (uint64_t) -1;
 				uint64_t index = 0;
 
 				for (uint64_t i = 0; i < delimiters.size(); i++)

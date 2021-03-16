@@ -265,7 +265,7 @@ namespace rapid
 
 					t++;
 					m.set(config.beta1.getValue() * m + (1 - config.beta1.getValue()) * dx);
-					auto mCorr = m / (1 - std::pow(config.beta1.getValue(), (_Ty) t));
+					auto mCorr = m / (1. - std::pow(config.beta1.getValue(), (_Ty) t));
 					v.set(config.beta2.getValue() * v + (1 - config.beta2.getValue()) * (dx * dx));
 					auto vCorr = v / (1 - std::pow(config.beta2.getValue(), (_Ty) t));
 					auto nextX = x - config.learningRate.getValue() * mCorr / (sqrt(vCorr) + config.epsilon.getValue());

@@ -184,7 +184,7 @@ namespace rapid
 					}
 				}
 
-				while (!stack.empty() > 0)
+				while (!stack.empty())
 				{
 					postfix.emplace_back(stack.top());
 					stack.pop();

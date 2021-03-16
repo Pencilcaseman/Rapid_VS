@@ -9,6 +9,10 @@
 #include "cblasAPI.h"
 #endif
 
+#ifdef RAPID_CUDA
+#include "cudaAPI.cuh"
+#endif
+
 namespace rapid
 {
 	namespace ndarray
@@ -109,7 +113,7 @@ namespace rapid
 			/// <param name="dims"></param>
 			/// <param name="pos"></param>
 			/// <returns></returns>
-			long int dimsToIndex(const std::vector<uint64_t> &dims, const std::vector<uint64_t> &pos)
+			uint64_t dimsToIndex(const std::vector<uint64_t> &dims, const std::vector<uint64_t> &pos)
 			{
 				uint64_t index = 0;
 				for (long int i = 0; i < dims.size(); i++)
@@ -130,13 +134,25 @@ namespace rapid
 			MASSIVE = 0b0100
 		};
 
+	#ifdef RAPID_CUDA
+		enum ArrayLocation {
+			CPU,
+			GPU
+		};
+	#else
+		enum ArrayLocation
+		{
+			CPU
+		};
+	#endif
+
 		/// <summary>
 		/// A powerful and fast ndarray type, supporting a wide variety
 		/// of optimized functions and routines. It also supports different
 		/// arrayTypes, allowing for greater flexibility.
 		/// </summary>
 		/// <typeparam name="arrayType"></typeparam>
-		template<typename arrayType>
+		template<typename arrayType, ArrayLocation location = CPU>
 		class Array
 		{
 		public:
@@ -162,7 +178,7 @@ namespace rapid
 			inline static void binaryOpArrayArray(const Array<arrayType> &a, const Array<arrayType> &b,
 												  Array<arrayType> &c, ExecutionType mode, Lambda func)
 			{
-				size_t size = prod(a.shape);
+				size_t size = math::prod(a.shape);
 
 				if (mode == ExecutionType::SERIAL)
 				{
@@ -215,7 +231,7 @@ namespace rapid
 			inline static void binaryOpArrayScalar(const Array<arrayType> &a, const arrayType &b,
 												   Array<arrayType> &c, ExecutionType mode, Lambda func)
 			{
-				size_t size = prod(a.shape);
+				size_t size = math::prod(a.shape);
 
 				if (mode == ExecutionType::SERIAL)
 				{
@@ -268,7 +284,7 @@ namespace rapid
 			inline static void binaryOpScalarArray(const arrayType &a, const Array<arrayType> &b,
 												   Array<arrayType> &c, ExecutionType mode, Lambda func)
 			{
-				size_t size = prod(b.shape);
+				size_t size = math::prod(b.shape);
 
 				if (mode == ExecutionType::SERIAL)
 				{
@@ -313,11 +329,11 @@ namespace rapid
 			/// <param name="b"></param>
 			/// <param name="mode"></param>
 			/// <param name="func"></param>
-			template<typename Lambda>
-			inline static void unaryOpArray(const Array<arrayType> &a, Array<arrayType> &b,
+			template<typename Lambda, ArrayLocation loc>
+			inline static void unaryOpArray(const Array<arrayType, loc> &a, Array<arrayType, loc> &b,
 											ExecutionType mode, Lambda func)
 			{
-				size_t size = prod(a.shape);
+				size_t size = math::prod(a.shape);
 
 				if (mode == ExecutionType::SERIAL)
 				{
@@ -368,9 +384,9 @@ namespace rapid
 				auto resData = res.dataStart;
 				auto thisData = dataStart;
 
-				for (size_t i = 0; i < rapid::min(shape[0], newShape[0]); i++)
+				for (size_t i = 0; i < rapid::math::min(shape[0], newShape[0]); i++)
 					memcpy(resData + i * newShape[1], thisData + i * shape[1],
-						   sizeof(arrayType) * rapid::min(shape[1], newShape[1]));
+						   sizeof(arrayType) * rapid::math::min(shape[1], newShape[1]));
 
 				return res;
 			}
@@ -386,14 +402,7 @@ namespace rapid
 			{
 				auto newThis = internal_resized(newShape);
 
-				// Only delete data if originCount becomes zero
-				(*originCount)--;
-
-				if ((*originCount) == 0)
-				{
-					delete[] dataOrigin;
-					delete originCount;
-				}
+				freeSelf();
 
 				originCount = newThis.originCount;
 				(*originCount)++;
@@ -414,8 +423,12 @@ namespace rapid
 				isZeroDim = true;
 				shape = {0};
 
-				dataStart = new arrayType[1];
-				dataStart[0] = (arrayType) 0;
+				if (location == CPU)
+					dataStart = new arrayType[1];
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+					cudaSafeCall(cudaMalloc(&dataStart, sizeof(arrayType)));
+			#endif
 
 				dataOrigin = dataStart;
 
@@ -426,13 +439,7 @@ namespace rapid
 			inline void set(const Array<arrayType> &other)
 			{
 				// Only delete data if originCount becomes zero
-				(*originCount)--;
-
-				if ((*originCount) == 0)
-				{
-					delete[] dataOrigin;
-					delete originCount;
-				}
+				freeSelf();
 
 				isZeroDim = other.isZeroDim;
 				shape = other.shape;
@@ -459,11 +466,18 @@ namespace rapid
 						rapidAssert(false, "Dimensions must be positive");
 			#endif
 
-				if (arrShape.empty() || prod(arrShape) == 0)
+				if (arrShape.empty() || math::prod(arrShape) == 0)
 				{
 					isZeroDim = true;
 					shape = {1};
-					dataStart = new arrayType[1];
+
+					if (location == CPU)
+						dataStart = new arrayType[1];
+				#ifdef RAPID_CUDA
+					else
+						cudaSafeCall(cudaMalloc(&dataStart, sizeof(arrayType)));
+				#endif
+
 					dataOrigin = dataStart;
 					originCount = new size_t;
 					*originCount = 1;
@@ -472,7 +486,14 @@ namespace rapid
 				{
 					isZeroDim = false;
 					shape = arrShape;
-					dataStart = new arrayType[prod(arrShape)];
+					
+					if (location == CPU)
+						dataStart = new arrayType[math::prod(arrShape)];
+				#ifdef RAPID_CUDA
+					else
+						cudaSafeCall(cudaMalloc(&dataStart, sizeof(arrayType) * math::prod(arrShape)));
+				#endif
+
 					dataOrigin = dataStart;
 					originCount = new size_t;
 					*originCount = 1;
@@ -505,7 +526,7 @@ namespace rapid
 			Array<arrayType> &operator=(const Array<arrayType> &other)
 			{
 				rapidAssert(shape == other.shape, "Invalid shape for array setting");
-				memcpy(dataStart, other.dataStart, prod(shape) * sizeof(arrayType));
+				memcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType));
 				return *this;
 			}
 
@@ -657,12 +678,22 @@ namespace rapid
 
 			~Array()
 			{
+				freeSelf();
+			}
+
+			inline void freeSelf()
+			{
 				// Only delete data if originCount becomes zero
 				(*originCount)--;
 
 				if ((*originCount) == 0)
 				{
-					delete[] dataOrigin;
+					if (location == CPU)
+						delete[] dataOrigin;
+				#ifdef RAPID_CUDA
+					else
+						cudaSafeCall(cudaFree(dataOrigin));
+				#endif
 					delete originCount;
 				}
 			}
@@ -751,8 +782,8 @@ namespace rapid
 			{
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::unaryOpArray(*this, res,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													 [](arrayType x)
+											   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+											   [](arrayType x)
 				{
 					return -x;
 				});
@@ -769,7 +800,7 @@ namespace rapid
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::binaryOpArrayArray(*this, other, res,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
 					return x + y;
@@ -787,7 +818,7 @@ namespace rapid
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::binaryOpArrayArray(*this, other, res,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
 					return x - y;
@@ -805,7 +836,7 @@ namespace rapid
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::binaryOpArrayArray(*this, other, res,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
 					return x * y;
@@ -823,7 +854,7 @@ namespace rapid
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::binaryOpArrayArray(*this, other, res,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
 					return x / y;
@@ -842,7 +873,7 @@ namespace rapid
 			{
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other,
-													  res, prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													  res, math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													  [](arrayType x, arrayType y)
 				{
 					return x + y;
@@ -861,7 +892,7 @@ namespace rapid
 			{
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
-													  prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													  [](arrayType x, arrayType y)
 				{
 					return x - y;
@@ -880,7 +911,7 @@ namespace rapid
 			{
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
-													  prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													  [](arrayType x, arrayType y)
 				{
 					return x * y;
@@ -899,7 +930,7 @@ namespace rapid
 			{
 				auto res = Array<arrayType>(shape);
 				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
-													  prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													  [](arrayType x, arrayType y)
 				{
 					return x / y;
@@ -911,7 +942,7 @@ namespace rapid
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 				Array<arrayType>::binaryOpArrayArray(*this, other, *this,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
 					return x + y;
@@ -924,7 +955,7 @@ namespace rapid
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 				Array<arrayType>::binaryOpArrayArray(*this, other, *this,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
 					return x - y;
@@ -937,7 +968,7 @@ namespace rapid
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 				Array<arrayType>::binaryOpArrayArray(*this, other, *this,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
 					return x * y;
@@ -950,7 +981,7 @@ namespace rapid
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
 				Array<arrayType>::binaryOpArrayArray(*this, other, *this,
-													 prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
 					return x / y;
@@ -965,27 +996,36 @@ namespace rapid
 			/// <param name="val"></param>
 			inline void fill(const arrayType &val)
 			{
-				Array<arrayType>::unaryOpArray(*this, *this,
-											   prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-											   [=](arrayType x)
+				if (location == CPU)
 				{
-					return val;
-				});
+					Array<arrayType, location>::unaryOpArray(*this, *this,
+												   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+												   [=](arrayType x)
+					{
+						return val;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else
+				{
+					cuda::fill(math::prod(shape), dataStart, val);
+				}
+			#endif
 			}
 
 			/// <summary>
-			/// Calculate the dot product with another array. If the
-			/// arrays are single-dimensional vectors, the vector product
+			/// Calculate the dot math::product with another array. If the
+			/// arrays are single-dimensional vectors, the vector math::product
 			/// is used and a scalar value is returned. If the arrays are
-			/// matrices, the matrix product is calculated. Otherwise, the
-			/// dot product of the final two dimensions of the array are
+			/// matrices, the matrix math::product is calculated. Otherwise, the
+			/// dot math::product of the final two dimensions of the array are
 			/// calculated.
 			/// </summary>
 			/// <param name="other"></param>
 			/// <returns></returns>
 			inline Array<arrayType> dot(const Array<arrayType> &other) const
 			{
-				rapidAssert(shape.size() == other.shape.size(), "Invalid number of dimensions for array dot product");
+				rapidAssert(shape.size() == other.shape.size(), "Invalid number of dimensions for array dot math::product");
 				uint64_t dims = shape.size();
 
 			#ifndef RAPID_NO_BLAS
@@ -993,8 +1033,8 @@ namespace rapid
 				{
 					case 1:
 						{
-							rapidAssert(shape[0] == other.shape[0], "Invalid shape for array product");
-							rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array product");
+							rapidAssert(shape[0] == other.shape[0], "Invalid shape for array math::product");
+							rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array math::product");
 
 							Array<arrayType> res(shape);
 							res.isZeroDim = true;
@@ -1004,7 +1044,7 @@ namespace rapid
 						}
 					case 2:
 						{
-							rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot product");
+							rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot math::product");
 
 							Array<arrayType> res({shape[0], other.shape[1]});
 
@@ -1040,8 +1080,8 @@ namespace rapid
 				{
 					case 1:
 						{
-							rapidAssert(shape[0] == other.shape[0], "Invalid shape for array product");
-							rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array product");
+							rapidAssert(shape[0] == other.shape[0], "Invalid shape for array math::product");
+							rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array math::product");
 
 							Array<arrayType> res({1});
 							res.isZeroDim = true;
@@ -1054,7 +1094,7 @@ namespace rapid
 						}
 					case 2:
 						{
-							rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot product");
+							rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot math::product");
 							uint64_t mode;
 							uint64_t size = shape[0] * shape[1] * other.shape[1];
 
@@ -1146,9 +1186,9 @@ namespace rapid
 
 								array_view<const arrayType, 2> a(M, N, resizedThis.dataStart);
 								array_view<const arrayType, 2> b(N, K, resizedOther.dataStart);
-								array_view<arrayType, 2> product(M, K, res.dataStart);
+								array_view<arrayType, 2> math::product(M, K, res.dataStart);
 
-								parallel_for_each(product.extent.tile<TS, TS>(), [=](tiled_index<TS, TS> t_idx) restrict(amp)
+								parallel_for_each(math::product.extent.tile<TS, TS>(), [=](tiled_index<TS, TS> t_idx) restrict(amp)
 								{
 									// Get the location of the thread relative to the tile (row, col)
 									// and the entire array_view (rowGlobal, colGlobal).
@@ -1173,10 +1213,10 @@ namespace rapid
 										t_idx.barrier.wait();
 									}
 
-									product[t_idx.global] = sum;
+									math::product[t_idx.global] = sum;
 								});
 
-								product.synchronize();
+								math::product.synchronize();
 
 								res.internal_resize({shape[0], other.shape[1]});
 							}
@@ -1200,7 +1240,7 @@ namespace rapid
 						}
 				}
 			#endif
-			}
+				}
 
 			/// <summary>
 			/// Transpose an array and return the result. If the
@@ -1230,7 +1270,7 @@ namespace rapid
 				if (shape.size() == 1 || (axes.size() == 1 && axes[0] == 0))
 				{
 					auto res = Array<arrayType>(newDims);
-					memcpy(res.dataStart, dataStart, sizeof(arrayType) * prod(newDims));
+					memcpy(res.dataStart, dataStart, sizeof(arrayType) * math::prod(newDims));
 					return res;
 				}
 
@@ -1256,7 +1296,7 @@ namespace rapid
 						int64_t i = 0, j = 0;
 						const arrayType *__restrict thisData = dataStart;
 						arrayType *__restrict resData = res.dataStart;
-						auto minCols = rapid::max(cols, 3) - 3;
+						auto minCols = rapid::math::max(cols, 3) - 3;
 
 					#pragma omp parallel for private(i, j) shared(resData, thisData, minCols) default(none) num_threads(8)
 						for (i = 0; i < rows; i++)
@@ -1285,9 +1325,9 @@ namespace rapid
 				std::vector<uint64_t> indices(shape.size(), 0);
 				std::vector<uint64_t> indicesRes(shape.size(), 0);
 
-				if (prod(shape) < 62000)
+				if (math::prod(shape) < 62000)
 				{
-					for (uint64_t i = 0; i < prod(shape); i++)
+					for (uint64_t i = 0; i < math::prod(shape); i++)
 					{
 						if (axes.empty())
 							for (uint64_t j = 0; j < shape.size(); j++)
@@ -1312,7 +1352,7 @@ namespace rapid
 				else
 				{
 					auto tmpShape = shape;
-					for (int64_t i = 0; i < prod(tmpShape); i++)
+					for (int64_t i = 0; i < math::prod(tmpShape); i++)
 					{
 						if (axes.empty())
 							for (int64_t j = 0; j < tmpShape.size(); j++)
@@ -1350,7 +1390,7 @@ namespace rapid
 			inline Array<arrayType> resized(const std::vector<uint64_t> &newShape) const
 			{
 				auto tmpNewShape = std::vector<uint64_t>(newShape.size(), 1);
-				uint64_t undefined = -1;
+				uint64_t undefined = (uint64_t) -1;
 
 				for (uint64_t i = 0; i < newShape.size(); i++)
 				{
@@ -1368,9 +1408,9 @@ namespace rapid
 				}
 
 				if (undefined != AUTO)
-					tmpNewShape[undefined] = prod(shape) / prod(tmpNewShape);
+					tmpNewShape[undefined] = math::prod(shape) / math::prod(tmpNewShape);
 
-				if (prod(tmpNewShape) != prod(shape))
+				if (math::prod(tmpNewShape) != math::prod(shape))
 					message::RapidError("Invalid Shape", "Invalid reshape size. Number of elements differ").display();
 
 				bool zeroDim = false;
@@ -1393,7 +1433,7 @@ namespace rapid
 			inline void resize(const std::vector<uint64_t> &newShape)
 			{
 				auto tmpNewShape = std::vector<uint64_t>(newShape.size(), 1);
-				uint64_t undefined = -1;
+				uint64_t undefined = (uint64_t) -1;
 
 				for (uint64_t i = 0; i < newShape.size(); i++)
 				{
@@ -1411,9 +1451,9 @@ namespace rapid
 				}
 
 				if (undefined != AUTO)
-					tmpNewShape[undefined] = prod(shape) / prod(tmpNewShape);
+					tmpNewShape[undefined] = math::prod(shape) / math::prod(tmpNewShape);
 
-				if (prod(tmpNewShape) != prod(shape))
+				if (math::prod(tmpNewShape) != math::prod(shape))
 					message::RapidError("Invalid Shape", "Invalid reshape size. Number of elements differ").display();
 
 				if (isZeroDim && tmpNewShape.size() == 1)
@@ -1428,7 +1468,7 @@ namespace rapid
 			inline Array<arrayType> mapped(Lambda func) const
 			{
 				auto res = Array<arrayType>(shape);
-				auto size = prod(shape);
+				auto size = math::prod(shape);
 				auto mode = ExecutionType::SERIAL;
 
 				if (size > 10000) mode = ExecutionType::PARALLEL;
@@ -1447,11 +1487,11 @@ namespace rapid
 				Array<arrayType> res;
 				res.isZeroDim = isZeroDim;
 				res.shape = shape;
-				res.dataStart = new arrayType[prod(shape)];
+				res.dataStart = new arrayType[math::prod(shape)];
 				res.dataOrigin = res.dataStart;
 				res.originCount = new size_t;
 				*(res.originCount) = 1;
-				memcpy(res.dataStart, dataStart, sizeof(arrayType) * prod(shape));
+				memcpy(res.dataStart, dataStart, sizeof(arrayType) * math::prod(shape));
 
 				return res;
 			}
@@ -1462,7 +1502,7 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <returns></returns>
 			std::string toString(uint64_t startDepth = 0) const;
-		};
+			};
 
 		template<typename t>
 		std::ostream &operator<<(std::ostream &os, const Array<t> &arr)
@@ -1512,7 +1552,7 @@ namespace rapid
 		{
 			auto res = Array<t>(other.shape);
 			Array<t>::binaryOpScalarArray(val, other, res,
-										  prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+										  math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 										  [](t x, t y)
 			{
 				return x + y;
@@ -1532,7 +1572,7 @@ namespace rapid
 		{
 			auto res = Array<t>(other.shape);
 			Array<t>::binaryOpScalarArray(val, other, res,
-										  prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+										  math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 										  [](t x, t y)
 			{
 				return x - y;
@@ -1552,7 +1592,7 @@ namespace rapid
 		{
 			auto res = Array<t>(other.shape);
 			Array<t>::binaryOpScalarArray(val, other, res,
-										  prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+										  math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 										  [](t x, t y)
 			{
 				return x * y;
@@ -1572,7 +1612,7 @@ namespace rapid
 		{
 			auto res = Array<t>(other.shape);
 			Array<t>::binaryOpScalarArray(val, other, res,
-										  prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+										  math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 										  [](t x, t y)
 			{
 				return x / y;
@@ -1609,7 +1649,7 @@ namespace rapid
 		{
 			t res = 0;
 
-			for (size_t i = 0; i < prod(arr.shape); i++)
+			for (size_t i = 0; i < math::prod(arr.shape); i++)
 				res += arr.dataStart[i];
 
 			return res;
@@ -1628,7 +1668,7 @@ namespace rapid
 			Array<t> result(arr.shape);
 
 			ExecutionType mode;
-			if (prod(arr.shape) > 10000)
+			if (math::prod(arr.shape) > 10000)
 				mode = ExecutionType::PARALLEL;
 			else
 				mode = ExecutionType::SERIAL;
@@ -1654,7 +1694,7 @@ namespace rapid
 			Array<t> result(arr.shape);
 
 			ExecutionType mode;
-			if (prod(arr.shape) > 10000)
+			if (math::prod(arr.shape) > 10000)
 				mode = ExecutionType::PARALLEL;
 			else
 				mode = ExecutionType::SERIAL;
@@ -1680,7 +1720,7 @@ namespace rapid
 			Array<t> result(arr.shape);
 
 			ExecutionType mode;
-			if (prod(arr.shape) > 10000)
+			if (math::prod(arr.shape) > 10000)
 				mode = ExecutionType::PARALLEL;
 			else
 				mode = ExecutionType::SERIAL;
@@ -1706,7 +1746,7 @@ namespace rapid
 			Array<t> result(arr.shape);
 
 			ExecutionType mode;
-			if (prod(arr.shape) > 10000)
+			if (math::prod(arr.shape) > 10000)
 				mode = ExecutionType::PARALLEL;
 			else
 				mode = ExecutionType::SERIAL;
@@ -1887,27 +1927,27 @@ namespace rapid
 			rapidAssert(a.shape.size() == 1 && b.shape.size() == 1, "Invalid size for meshgrid. Must be a 1D array");
 			Array<t> result({2, b.shape[0], a.shape[0]});
 
-			if (prod(result.shape) < 10000)
+			if (math::prod(result.shape) < 10000)
 			{
 				for (int64_t i = 0; i < b.shape[0]; i++)
 					for (int64_t j = 0; j < a.shape[0]; j++)
-						result.setVal<int64_t>({(int64_t) 0, i, j}, a.accessVal<int64_t>({j}));
+						result.setVal({(int64_t) 0, i, j}, a.accessVal({j}));
 
 				for (int64_t i = 0; i < b.shape[0]; i++)
 					for (int64_t j = 0; j < a.shape[0]; j++)
-						result.setVal<int64_t>({(int64_t) 1, i, j}, b.accessVal<int64_t>({i}));
+						result.setVal({(int64_t) 1, i, j}, b.accessVal({i}));
 			}
 			else
 			{
 			#pragma omp parallel for
 				for (int64_t i = 0; i < b.shape[0]; i++)
 					for (int64_t j = 0; j < a.shape[0]; j++)
-						result.setVal<int64_t>({(int64_t) 0, i, j}, a.accessVal<int64_t>({j}));
+						result.setVal({(int64_t) 0, i, j}, a.accessVal({j}));
 
 			#pragma omp parallel for
 				for (int64_t i = 0; i < b.shape[0]; i++)
 					for (int64_t j = 0; j < a.shape[0]; j++)
-						result.setVal<int64_t>({(int64_t) 1, i, j}, b.accessVal<int64_t>({i}));
+						result.setVal({(int64_t) 1, i, j}, b.accessVal({i}));
 			}
 
 			return result;
@@ -1952,19 +1992,19 @@ namespace rapid
 		{
 			Array<resT> res(src.shape);
 
-			if (prod(src.shape) < 10000)
+			if (math::prod(src.shape) < 10000)
 			{
-				for (int64_t i = 0; i < prod(src.shape); i++)
+				for (int64_t i = 0; i < math::prod(src.shape); i++)
 					res.dataStart[i] = (resT) src.dataStart[i];
 			}
 			else
 			{
 			#pragma omp parallel for
-				for (int64_t i = 0; i < prod(src.shape); i++)
+				for (int64_t i = 0; i < math::prod(src.shape); i++)
 					res.dataStart[i] = (resT) src.dataStart[i];
 			}
 
 			return res;
 		}
+		}
 	}
-}
