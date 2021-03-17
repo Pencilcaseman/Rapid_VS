@@ -377,17 +377,28 @@ namespace rapid
 			/// </summary>
 			/// <param name="newShape"></param>
 			/// <returns></returns>
-			inline Array<arrayType> internal_resized(const std::vector<uint64_t> &newShape) const
+			inline Array<arrayType, location> internal_resized(const std::vector<uint64_t> &newShape) const
 			{
 				rapidAssert(newShape.size() == 2, "Resizing currently only supports 2D array");
 
-				Array<arrayType> res(newShape);
+				Array<arrayType, location> res(newShape);
 				auto resData = res.dataStart;
 				auto thisData = dataStart;
 
-				for (size_t i = 0; i < rapid::math::min(shape[0], newShape[0]); i++)
-					memcpy(resData + i * newShape[1], thisData + i * shape[1],
-						   sizeof(arrayType) * rapid::math::min(shape[1], newShape[1]));
+				if (location == CPU)
+				{
+					for (size_t i = 0; i < rapid::math::min(shape[0], newShape[0]); i++)
+						memcpy(resData + i * newShape[1], thisData + i * shape[1],
+							   sizeof(arrayType) * rapid::math::min(shape[1], newShape[1]));
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					for (size_t i = 0; i < rapid::math::min(shape[0], newShape[0]); i++)
+						cudaSafeCall(cudaMemcpy(resData + i * newShape[1], thisData + i * shape[1],
+									 sizeof(arrayType) * rapid::math::min(shape[1], newShape[1]), cudaMemcpyHostToDevice));
+				}
+			#endif
 
 				return res;
 			}
@@ -559,11 +570,11 @@ namespace rapid
 			/// <param name="originCount"></param>
 			/// <param name="isZeroDim"></param>
 			/// <returns></returns>
-			static inline Array<arrayType> fromData(const std::vector<size_t> &arrDims,
+			static inline Array<arrayType, location> fromData(const std::vector<size_t> &arrDims,
 													arrayType *newDataOrigin, arrayType *dataStart,
 													size_t *originCount, bool isZeroDim)
 			{
-				Array<arrayType> res;
+				Array<arrayType, location> res;
 				res.isZeroDim = isZeroDim;
 				res.shape = arrDims;
 				res.dataOrigin = newDataOrigin;
@@ -579,23 +590,30 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <param name="data"></param>
 			/// <returns></returns>
-			template<typename t, ArrayLocation loc>
-			static inline Array<arrayType> fromData(const std::initializer_list<t> &data)
+			template<typename t>
+			static inline Array<arrayType, location> fromData(const std::initializer_list<t> &data)
 			{
-				auto res = Array<arrayType>({data.size()});
+				auto res = Array<arrayType, location>({data.size()});
 				std::vector<arrayType> values;
 				for (const auto &val : data)
 					values.emplace_back(val);
-				memcpy(res.dataStart, values.data(), sizeof(arrayType) * data.size());
+				
+				if (location == CPU)
+					memcpy(res.dataStart, values.data(), sizeof(arrayType) * data.size());
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+					cudaSafeCall(cudaMemcpy(res.dataStart, values.data(), sizeof(arrayType) * data.size(), cudaMemcpyHostToDevice));
+			#endif
+
 				return res;
 			}
 
 
-		#define imp_temp template<typename t, ArrayLocation loc>
-		#define imp_func_def(x) static inline Array<arrayType> fromData(const x &data)
-		#define imp_func_body	auto res = Array<arrayType>(imp::extractShape(data)); \
+		#define imp_temp template<typename t>
+		#define imp_func_def(x) static inline Array<arrayType, location> fromData(const x &data)
+		#define imp_func_body	auto res = Array<arrayType, location>(imp::extractShape(data)); \
 							uint64_t index = 0; \
-							for (const auto &val : data) res[index++] = Array<arrayType>::fromData(val); \
+							for (const auto &val : data) res[index++] = Array<arrayType, location>::fromData(val); \
 							return res;
 		#define L std::initializer_list
 
@@ -708,13 +726,24 @@ namespace rapid
 			/// Cast a zero-dimensional array to a scalar value
 			/// </summary>
 			/// <typeparam name="t"></typeparam>
-			template<typename t, ArrayLocation loc>
+			template<typename t>
 			inline operator t() const
 			{
-				// if (std::is_integral<t>::value || std::is_floating_point<t>::value)
 				if (!isZeroDim)
 					rapidAssert(isZeroDim, "Cannot cast multidimensional array to scalar value");
-				return (t) (dataStart[0]);
+				if (location == CPU)
+					return (t) (dataStart[0]);
+
+			#ifdef RAPID_CUDA
+				if (location == GPU)
+				{
+					auto resPtr = new arrayType;
+					cudaSafeCall(cudaMemcpy(resPtr, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
+					auto res = (t) (*resPtr);
+					delete resPtr;
+					return res;
+				}
+			#endif
 			}
 
 			/// <summary>
@@ -724,18 +753,18 @@ namespace rapid
 			/// </summary>
 			/// <param name="index"></param>
 			/// <returns></returns>
-			Array<arrayType> operator[](const size_t &index) const
+			Array<arrayType, location> operator[](const size_t &index) const
 			{
 				rapidAssert(index < shape[0], "Index out of range for array subscript");
 
 				(*originCount)++;
 
 				if (shape.size() == 1)
-					return Array<arrayType>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+					return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
 													  originCount, true);
 
 				std::vector<size_t> resShape(shape.begin() + 1, shape.end());
-				return Array<arrayType>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+				return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
 												  originCount, isZeroDim);
 			}
 
@@ -784,10 +813,10 @@ namespace rapid
 				dataStart[utils::ndToScalar(index, shape)] = val;
 			}
 
-			inline Array<arrayType> operator-() const
+			inline Array<arrayType, location> operator-() const
 			{
-				auto res = Array<arrayType>(shape);
-				Array<arrayType>::unaryOpArray(*this, res,
+				auto res = Array<arrayType, location>(shape);
+				Array<arrayType, location>::unaryOpArray(*this, res,
 											   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 											   [](arrayType x)
 				{
@@ -829,10 +858,10 @@ namespace rapid
 			/// </summary>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			inline Array<arrayType> operator-(const Array<arrayType> &other) const
+			inline Array<arrayType, location> operator-(const Array<arrayType, location> &other) const
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				auto res = Array<arrayType>(shape);
+				auto res = Array<arrayType, location>(shape);
 				Array<arrayType>::binaryOpArrayArray(*this, other, res,
 													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
@@ -847,10 +876,10 @@ namespace rapid
 			/// </summary>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			inline Array<arrayType> operator*(const Array<arrayType> &other) const
+			inline Array<arrayType, location> operator*(const Array<arrayType, location> &other) const
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				auto res = Array<arrayType>(shape);
+				auto res = Array<arrayType, location>(shape);
 				Array<arrayType>::binaryOpArrayArray(*this, other, res,
 													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
@@ -865,10 +894,10 @@ namespace rapid
 			/// </summary>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			inline Array<arrayType> operator/(const Array<arrayType> &other) const
+			inline Array<arrayType, location> operator/(const Array<arrayType, location> &other) const
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				auto res = Array<arrayType>(shape);
+				auto res = Array<arrayType, location>(shape);
 				Array<arrayType>::binaryOpArrayArray(*this, other, res,
 													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
@@ -884,10 +913,10 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			template<typename t, ArrayLocation loc>
-			inline Array<arrayType> operator+(const t &other) const
+			template<typename t>
+			inline Array<arrayType, location> operator+(const t &other) const
 			{
-				auto res = Array<arrayType>(shape);
+				auto res = Array<arrayType, location>(shape);
 				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other,
 													  res, math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													  [](arrayType x, arrayType y)
@@ -903,11 +932,11 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			template<typename t, ArrayLocation loc>
-			inline Array<arrayType> operator-(const t &other) const
+			template<typename t>
+			inline Array<arrayType, location> operator-(const t &other) const
 			{
-				auto res = Array<arrayType>(shape);
-				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
+				auto res = Array<arrayType, location>(shape);
+				Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
 													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													  [](arrayType x, arrayType y)
 				{
@@ -922,11 +951,11 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			template<typename t, ArrayLocation loc>
-			inline Array<arrayType> operator*(const t &other) const
+			template<typename t>
+			inline Array<arrayType, location> operator*(const t &other) const
 			{
 				auto res = Array<arrayType>(shape);
-				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
+				Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
 													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													  [](arrayType x, arrayType y)
 				{
@@ -941,11 +970,11 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			template<typename t, ArrayLocation loc>
-			inline Array<arrayType> operator/(const t &other) const
+			template<typename t>
+			inline Array<arrayType, location> operator/(const t &other) const
 			{
-				auto res = Array<arrayType>(shape);
-				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other, res,
+				auto res = Array<arrayType, location>(shape);
+				Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
 													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													  [](arrayType x, arrayType y)
 				{
@@ -954,10 +983,10 @@ namespace rapid
 				return res;
 			}
 
-			inline Array<arrayType> &operator+=(const Array<arrayType> &other)
+			inline Array<arrayType, location> &operator+=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				Array<arrayType>::binaryOpArrayArray(*this, other, *this,
+				Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
 													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
@@ -967,10 +996,10 @@ namespace rapid
 				return *this;
 			}
 
-			inline Array<arrayType> &operator-=(const Array<arrayType> &other)
+			inline Array<arrayType, location> &operator-=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				Array<arrayType>::binaryOpArrayArray(*this, other, *this,
+				Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
 													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
@@ -980,10 +1009,10 @@ namespace rapid
 				return *this;
 			}
 
-			inline Array<arrayType> &operator*=(const Array<arrayType> &other)
+			inline Array<arrayType, location> &operator*=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				Array<arrayType>::binaryOpArrayArray(*this, other, *this,
+				Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
 													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
@@ -993,10 +1022,10 @@ namespace rapid
 				return *this;
 			}
 
-			inline Array<arrayType> &operator/=(const Array<arrayType> &other)
+			inline Array<arrayType, location> &operator/=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				Array<arrayType>::binaryOpArrayArray(*this, other, *this,
+				Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
 													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 													 [](arrayType x, arrayType y)
 				{
@@ -1908,7 +1937,7 @@ namespace rapid
 			using ct = typename std::common_type<s, e, t>::type;
 
 			auto len = (uint64_t) ceil(abs((ct) end - (ct) start) / (ct) inc);
-			auto res = Array<t, loc>({len});
+			auto res = Array<t, CPU>({len});
 			for (uint64_t i = 0; i < len; i++)
 				res[i] = (ct) start + (ct) inc * (ct) i;
 			return res;
@@ -1923,7 +1952,7 @@ namespace rapid
 		/// <param name="end"></param>
 		/// <returns></returns>
 		template<typename e>
-		inline Array<e> arange(e end)
+		inline Array<e, CPU> arange(e end)
 		{
 			return arange((e) 0, end, (e) 1);
 		}

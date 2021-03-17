@@ -48,74 +48,74 @@ namespace rapid
 				}
 			};
 
-			template<typename _Ty>
+			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
 			struct NDArray
 			{
 				int initialized = 0;
-				ndarray::Array<_Ty> defaultValue;
-				ndarray::Array<_Ty> value;
+				ndarray::Array<_Ty, loc> defaultValue;
+				ndarray::Array<_Ty, loc> value;
 
-				inline void setValue(const ndarray::Array<_Ty> &val)
+				inline void setValue(const ndarray::Array<_Ty, loc> &val)
 				{
 					initialized = 1;
 					value.set(val.copy());
 				}
 
-				inline ndarray::Array<_Ty> getValue() const
+				inline ndarray::Array<_Ty, loc> getValue() const
 				{
 					return initialized ? value : defaultValue;
 				}
 			};
 
-			template<typename _Ty>
+			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
 			struct Config
 			{
-				int initialized = 0;             // Is the context initialized
+				int initialized = 0;               // Is the context initialized
 
 				LearningRate<_Ty> learningRate;    // Scalar learning rate
 				Scalar<_Ty> momentum;              // Scalar between 0 and 1 representing momentum value
-				NDArray<_Ty> velocity;             // ndarray::Array of same shape as w storing a moving average of gradients
+				NDArray<_Ty, loc> velocity;        // ndarray::Array of same shape as w storing a moving average of gradients
 				Scalar<_Ty> decayRate;             // Scalar between 0 and 1 storing the decay rate for the squared gradient cache
 				Scalar<_Ty> epsilon;               // Small scalar used for smoothing to avoid division by zero
-				NDArray<_Ty> cache;                // Moving average of second moments of gradients
+				NDArray<_Ty, loc> cache;           // Moving average of second moments of gradients
 				Scalar<_Ty> beta1;                 // Decay rate for moving average of first moment gradient
 				Scalar<_Ty> beta2;                 // Decay rate for moving average of second moment gradient
-				NDArray<_Ty> m;                    // Moving average of gradient
-				NDArray<_Ty> v;                    // Moving average of squared gradient
+				NDArray<_Ty, loc> m;               // Moving average of gradient
+				NDArray<_Ty, loc> v;               // Moving average of squared gradient
 				uint64_t t = 0;                    // Iteration number
 			};
 
-			template<typename _Ty>
+			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
 			struct OptimOutput
 			{
-				ndarray::Array<_Ty> weight;
+				ndarray::Array<_Ty, ndarray::CPU> weight;
 				Config<_Ty> config;
 			};
 
-			template<typename _Ty>
+			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
 			class Optimizer
 			{
 			public:
-				virtual inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &w,
-													  const ndarray::Array<_Ty> &dw,
+				virtual inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
+													  const ndarray::Array<_Ty, loc> &dw,
 													  Config<_Ty> &config) = 0;
 
-				virtual inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &w,
-													  const ndarray::Array<_Ty> &dw) = 0;
+				virtual inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
+													  const ndarray::Array<_Ty, loc> &dw) = 0;
 			};
 			
 			/// <summary>
 			/// Vanilla stochastic gradient descent
 			/// </summary>
 			/// <typeparam name="_Ty"></typeparam>
-			template<typename _Ty>
-			class sgd : public Optimizer<_Ty>
+			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
+			class sgd : public Optimizer<_Ty, loc>
 			{
 			public:
 				sgd() = default;
 
-				inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &w,
-											  const ndarray::Array<_Ty> &dw,
+				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
+											  const ndarray::Array<_Ty, loc> &dw,
 											  Config<_Ty> &config) override
 				{
 					if (config.initialized == 0)
@@ -129,10 +129,10 @@ namespace rapid
 					return {w, config};
 				}
 
-				inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &w,
-											  const ndarray::Array<_Ty> &dw) override
+				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
+											  const ndarray::Array<_Ty, loc> &dw) override
 				{
-					Config<_Ty> config;
+					Config<_Ty, loc> config;
 					config.initialized = 1;
 					config.learningRate.defaultValue = 1e-2;
 
@@ -144,15 +144,15 @@ namespace rapid
 			/// Stochastic gradient descent with momentum
 			/// </summary>
 			/// <typeparam name="_Ty"></typeparam>
-			template<typename _Ty>
-			class sgdMomentum : public Optimizer<_Ty>
+			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
+			class sgdMomentum : public Optimizer<_Ty, loc>
 			{
 			public:
 				sgdMomentum() = default;
 
-				inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &w,
-											  const ndarray::Array<_Ty> &dw,
-											  Config<_Ty> &config) override
+				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
+											  const ndarray::Array<_Ty, loc> &dw,
+											  Config<_Ty, loc> &config) override
 				{
 					if (config.initialized == 0)
 					{
@@ -171,10 +171,10 @@ namespace rapid
 					return {nextW, config};
 				}
 
-				inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &w,
-											  const ndarray::Array<_Ty> &dw) override
+				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
+											  const ndarray::Array<_Ty, loc> &dw) override
 				{
-					Config<_Ty> config;
+					Config<_Ty, loc> config;
 
 					config.initialized = 1;
 					config.learningRate.defaultValue = 1e-2;
@@ -190,15 +190,15 @@ namespace rapid
 			/// to set adaptive per-parameter learning rates
 			/// </summary>
 			/// <typeparam name="_Ty"></typeparam>
-			template<typename _Ty>
-			class rmsprop : public Optimizer<_Ty>
+			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
+			class rmsprop : public Optimizer<_Ty, loc>
 			{
 			public:
 				rmsprop() = default;
 
-				inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &x,
-											  const ndarray::Array<_Ty> &dx,
-											  Config<_Ty> &config) override
+				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &x,
+											  const ndarray::Array<_Ty, loc> &dx,
+											  Config<_Ty, loc> &config) override
 				{
 					if (config.initialized == 0)
 					{
@@ -217,10 +217,10 @@ namespace rapid
 					return {nextX, config};
 				}
 
-				inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &x,
-											  const ndarray::Array<_Ty> &dx) override
+				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &x,
+											  const ndarray::Array<_Ty, loc> &dx) override
 				{
-					Config<_Ty> config;
+					Config<_Ty, loc> config;
 
 					config.initialized = 1;
 					config.learningRate.defaultValue = 1e-2;
@@ -237,15 +237,15 @@ namespace rapid
 			/// both the gradient and its square, and a bias correction term
 			/// </summary>
 			/// <typeparam name="_Ty"></typeparam>
-			template<typename _Ty>
-			class adam : public Optimizer<_Ty>
+			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
+			class adam : public Optimizer<_Ty, loc>
 			{
 			public:
 				adam() = default;
 
-				inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &x,
-											  const ndarray::Array<_Ty> &dx,
-											  Config<_Ty> &config) override
+				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &x,
+											  const ndarray::Array<_Ty, loc> &dx,
+											  Config<_Ty, loc> &config) override
 				{
 					if (config.initialized == 0)
 					{
@@ -276,10 +276,10 @@ namespace rapid
 					return {nextX, config};
 				}
 
-				inline OptimOutput<_Ty> apply(ndarray::Array<_Ty> &x,
-											  const ndarray::Array<_Ty> &dx) override
+				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &x,
+											  const ndarray::Array<_Ty, loc> &dx) override
 				{
-					Config<_Ty> config;
+					Config<_Ty, loc> config;
 
 					config.initialized = 1;
 					config.learningRate.defaultValue = 1e-3;

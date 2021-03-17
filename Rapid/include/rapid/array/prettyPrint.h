@@ -143,8 +143,20 @@ namespace rapid
 		template<typename t, ArrayLocation loc>
 		std::string Array<t, loc>::toString(uint64_t startDepth) const
 		{
-			if (isZeroDim)
-				return std::to_string(dataStart[0]);
+			if (loc == CPU)
+			{
+				if (isZeroDim)
+					return std::to_string(dataStart[0]);
+			}
+		#ifdef RAPID_CUDA
+			else if (loc == GPU)
+			{
+				if (isZeroDim)
+				{
+					return std::to_string((t) (*this));
+				}
+			}
+		#endif
 
 			std::vector<utils::strContainer> formatted(math::prod(shape), {"", 0});
 			size_t longestIntegral = 0;
