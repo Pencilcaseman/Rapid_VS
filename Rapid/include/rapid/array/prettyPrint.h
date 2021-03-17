@@ -1,5 +1,9 @@
 #pragma once
 
+#include "../internal.h"
+#include "../math.h"
+#include "arrayCore.h"
+
 namespace rapid
 {
 	namespace ndarray
@@ -158,16 +162,22 @@ namespace rapid
 			std::vector<uint64_t> currentIndex(shape.size(), 0);
 			currentIndex[currentIndex.size() - 1] = (uint64_t) -1;
 
-			t *arrayData;
+			t *arrayData = nullptr;
 			if (loc == CPU)
 			{
 				arrayData = dataStart;
 			}
-			else
+		#ifdef RAPID_CUDA
+			else if (loc == GPU)
 			{
+				cudaSafeCall(cudaDeviceSynchronize());
 				arrayData = new t[math::prod(shape)];
 				cudaSafeCall(cudaMemcpy(arrayData, dataStart, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
 			}
+		#endif
+
+			if (arrayData == nullptr)
+				message::RapidError("Printing Error", "Unable to print array due to invalid location or nullptr data").display();
 
 			while (utils::incArr(currentIndex, shape))
 			{
@@ -195,8 +205,10 @@ namespace rapid
 				}
 			}
 			
+		#ifdef RAPID_CUDA
 			if (loc == GPU)
 				delete[] arrayData;
+		#endif
 
 			std::vector<std::string> adjusted(formatted.size(), "");
 

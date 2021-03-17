@@ -10,16 +10,33 @@
 
 int main()
 {
-	auto x = rapid::ndarray::Array<float, rapid::ndarray::GPU>({10000, 10000});
-
-	// 26.365480 ms --> 4m 23.65s
-	// 1.033473 ms  --> 0m 10.33s
-
-	START_TIMER(0, 10000);
-	x.fill(3.14159);
-	END_TIMER(0);
+	auto arr = rapid::ndarray::Array<float, rapid::ndarray::GPU>({10, 10});
+	arr.fill(1);
 	
-	std::cout << x.toString() << "\n";
+	std::cout << arr << "\n\n";
+	std::cout << (arr + arr) << "\n\n";
+
+	auto cpuArr = rapid::ndarray::Array<float, rapid::ndarray::CPU>({20000, 20000});
+	cpuArr.fill(1);
+
+	std::cout << "CPU Iterations: ";
+	uint64_t cpuIters;
+	std::cin >> cpuIters;
+
+	START_TIMER(0, cpuIters);
+	auto res = cpuArr + cpuArr;
+	END_TIMER(0);
+
+	auto gpuArr = rapid::ndarray::Array<float, rapid::ndarray::GPU>({20000, 20000});
+	gpuArr.fill(1);
+
+	std::cout << "GPU Iterations: ";
+	uint64_t gpuIters;
+	std::cin >> gpuIters;
+
+	START_TIMER(1, gpuIters);
+	auto res = gpuArr + gpuArr;
+	END_TIMER(1);
 
 	return 0;
 }

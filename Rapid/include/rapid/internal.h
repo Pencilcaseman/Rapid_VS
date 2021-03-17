@@ -33,6 +33,12 @@
 
 #include <omp.h>
 
+#ifdef _DEBUG
+#define RAPID_DEBUG
+#else
+#define RAPID_RELEASE
+#endif
+
 #ifndef RAPID_CUDA
 #ifdef CUDA_VERSION 
 #define RAPID_CUDA
