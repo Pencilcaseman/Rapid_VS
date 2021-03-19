@@ -59,7 +59,7 @@ int main()
 	std::cout << lhs.dot(rhs) << "\n\n";
 
 	// 6.904483 ms
-	auto speedTest = rapid::ndarray::Array<double, CPU>({1000, 1000});
+	auto speedTest = rapid::ndarray::Array<double, GPU>({1000, 1000});
 
 	START_TIMER(0, 1000);
 	auto res = speedTest.dot(speedTest);

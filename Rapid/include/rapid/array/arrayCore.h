@@ -1516,8 +1516,6 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
 				{
-				cudaSafeCall(cudaDeviceSynchronize());
-
 					switch (dims)
 					{
 						case 1:
@@ -1527,7 +1525,7 @@ namespace rapid
 
 								Array<arrayType, location> res({1});
 								res.isZeroDim = true;
-								
+
 								cuda::dot(1, shape[0], other.shape[0], dataStart, other.dataStart, res.dataStart);
 
 								return res;
@@ -1535,12 +1533,61 @@ namespace rapid
 						case 2:
 							{
 								rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot math::product");
+								uint64_t mode;
+								uint64_t size = shape[0] * shape[1] * other.shape[1];
 
 								Array<arrayType, location> res({shape[0], other.shape[1]});
 
 								uint64_t m = shape[0];
 								uint64_t n = shape[1];
 								uint64_t k = other.shape[1];
+
+								arrayType dotAlpha = 1;
+								arrayType dotBeta = 0;
+
+// 								arrayType *tempThis;
+// 								cudaSafeCall(cudaMalloc(&tempThis, sizeof(arrayType) * math::prod(shape)));
+// 								cublasSafeCall(cublasSgeam(handle::handle,
+// 											   CUBLAS_OP_T, CUBLAS_OP_T,
+// 											   m, n,
+// 											   &dotAlpha,
+// 											   dataStart, n,
+// 											   &dotBeta,
+// 											   dataStart, n,
+// 											   tempThis, m));
+// 
+// 								arrayType *tempOther;
+// 								cudaSafeCall(cudaMalloc(&tempOther, sizeof(arrayType) * math::prod(other.shape)));
+// 								cublasSafeCall(cublasSgeam(handle::handle,
+// 											   CUBLAS_OP_T, CUBLAS_OP_T,
+// 											   n, k,
+// 											   &dotAlpha,
+// 											   other.dataStart, k,
+// 											   &dotBeta,
+// 											   other.dataStart, k,
+// 											   tempOther, n));
+// 
+// 								arrayType *tempRes;
+// 								cudaSafeCall(cudaMalloc(&tempRes, sizeof(arrayType) * math::prod(res.shape)));
+// 
+// 								// cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, tempThis, m, tempOther, n, &dotBeta, res.dataStart, m);
+// 								cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, tempThis, m, tempOther, n, &dotBeta, tempRes, m);
+// 
+// 								cudaSafeCall(cudaFree(tempThis));
+// 								cudaSafeCall(cudaFree(tempOther));
+// 
+// 								cudaSafeCall(cudaDeviceSynchronize());
+// 
+// 								cublasSafeCall(cublasSgeam(handle::handle,
+// 											   CUBLAS_OP_T, CUBLAS_OP_T,
+// 											   m, k,
+// 											   &dotAlpha,
+// 											   tempRes, k,
+// 											   &dotBeta,
+// 											   tempRes, k,
+// 											   res.dataStart, n));
+// 
+// 								cudaSafeCall(cudaFree(tempRes));
 
 								cuda::dot(m, n, k, dataStart, other.dataStart, res.dataStart);
 
