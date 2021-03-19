@@ -13,13 +13,57 @@ int main()
 	using rapid::ndarray::CPU;
 	using rapid::ndarray::GPU;
 
-	auto arr = rapid::ndarray::Array<float, CPU>::fromData({{1, 2}, {3, 4}});
-	arr[0] = rapid::ndarray::Array<float, CPU>::fromData({123, 456});
+	auto arr = rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
 	
 	std::cout << arr << "\n\n";
-	std::cout << arr[0] << "\n\n";
-	std::cout << arr[0][0] << "\n\n";
-	std::cout << (int) arr[0][0] << "\n\n";
+	std::cout << arr + arr << "\n\n";
+	std::cout << arr - arr << "\n\n";
+	std::cout << arr * arr << "\n\n";
+	std::cout << arr / arr << "\n\n";
+	
+	std::cout << "\n\n";
+
+	std::cout << arr + 10 << "\n\n";
+	std::cout << arr - 10 << "\n\n";
+	std::cout << arr * 10 << "\n\n";
+	std::cout << arr / 10 << "\n\n";
+
+	std::cout << "\n\n";
+
+	std::cout << arr << "\n\n";
+	arr += rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
+	std::cout << arr << "\n\n";
+	arr -= rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
+	std::cout << arr << "\n\n";
+	arr *= rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
+	std::cout << arr << "\n\n";
+	arr /= rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
+	std::cout << arr << "\n\n";
+
+	std::cout << "\n\n";
+
+	std::cout << arr << "\n\n";
+	arr += 10;
+	std::cout << arr << "\n\n";
+	arr -= 10;
+	std::cout << arr << "\n\n";
+	arr *= 10;
+	std::cout << arr << "\n\n";
+	arr /= 10;
+	std::cout << arr << "\n\n";
+
+	std::cout << "\n\n";
+
+	auto lhs = rapid::ndarray::Array<float, GPU>::fromData({{1, 2, 3}, {4, 5, 6}});
+	auto rhs = rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}, {5, 6}});
+	std::cout << lhs.dot(rhs) << "\n\n";
+
+	// 6.904483 ms
+	auto speedTest = rapid::ndarray::Array<double, CPU>({1000, 1000});
+
+	START_TIMER(0, 1000);
+	auto res = speedTest.dot(speedTest);
+	END_TIMER(0);
 
 	return 0;
 }

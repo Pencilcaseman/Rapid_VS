@@ -53,6 +53,8 @@
 #include <curand.h>
 #include <curand_kernel.h>
 
+#pragma comment (lib, "cublas.lib")
+
 // cuBLAS API errors
 static const char *HIDDEN_cudaGetErrorEnum(cublasStatus_t error)
 {

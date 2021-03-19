@@ -17,6 +17,21 @@ namespace rapid
 {
 	namespace ndarray
 	{
+	#ifdef RAPID_CUDA
+		namespace handle
+		{
+			static cublasHandle_t handle;
+			bool handleInitialized = false;
+
+			inline void createHandle()
+			{
+				cublasSafeCall(cublasCreate(&handle));
+				cublasSafeCall(cublasSetMathMode(handle, CUBLAS_DEFAULT_MATH));
+				handleInitialized = true;
+			}
+		}
+	#endif
+
 		namespace utils
 		{
 			struct strContainer
@@ -432,6 +447,11 @@ namespace rapid
 			/// </summary>
 			Array()
 			{
+			#ifdef RAPID_CUDA
+				if (!handle::handleInitialized)
+					handle::createHandle();
+			#endif
+
 				isZeroDim = true;
 				shape = {0};
 
@@ -472,6 +492,11 @@ namespace rapid
 			/// <param name="arrShape"></param>
 			Array(const std::vector<size_t> &arrShape)
 			{
+			#ifdef RAPID_CUDA
+				if (!handle::handleInitialized)
+					handle::createHandle();
+			#endif
+
 			#ifdef RAPID_DEBUG
 				for (const auto &val : arrShape)
 					if (val <= 0)
@@ -571,9 +596,14 @@ namespace rapid
 			/// <param name="isZeroDim"></param>
 			/// <returns></returns>
 			static inline Array<arrayType, location> fromData(const std::vector<size_t> &arrDims,
-													arrayType *newDataOrigin, arrayType *dataStart,
-													size_t *originCount, bool isZeroDim)
+															  arrayType *newDataOrigin, arrayType *dataStart,
+															  size_t *originCount, bool isZeroDim)
 			{
+			#ifdef RAPID_CUDA
+				if (!handle::handleInitialized)
+					handle::createHandle();
+			#endif
+
 				Array<arrayType, location> res;
 				res.isZeroDim = isZeroDim;
 				res.shape = arrDims;
@@ -593,11 +623,16 @@ namespace rapid
 			template<typename t>
 			static inline Array<arrayType, location> fromData(const std::initializer_list<t> &data)
 			{
+			#ifdef RAPID_CUDA
+				if (!handle::handleInitialized)
+					handle::createHandle();
+			#endif
+
 				auto res = Array<arrayType, location>({data.size()});
 				std::vector<arrayType> values;
 				for (const auto &val : data)
 					values.emplace_back(val);
-				
+
 				if (location == CPU)
 					memcpy(res.dataStart, values.data(), sizeof(arrayType) * data.size());
 			#ifdef RAPID_CUDA
@@ -761,11 +796,11 @@ namespace rapid
 
 				if (shape.size() == 1)
 					return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
-													  originCount, true);
+																originCount, true);
 
 				std::vector<size_t> resShape(shape.begin() + 1, shape.end());
 				return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
-												  originCount, isZeroDim);
+															originCount, isZeroDim);
 			}
 
 			/// <summary>
@@ -817,8 +852,8 @@ namespace rapid
 			{
 				auto res = Array<arrayType, location>(shape);
 				Array<arrayType, location>::unaryOpArray(*this, res,
-											   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-											   [](arrayType x)
+														 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+														 [](arrayType x)
 				{
 					return -x;
 				});
@@ -837,9 +872,9 @@ namespace rapid
 				if (location == CPU)
 				{
 					auto res = Array<arrayType, location>(shape);
-					Array<arrayType>::binaryOpArrayArray(*this, other, res,
-														 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-														 [](arrayType x, arrayType y)
+					Array<arrayType, location>::binaryOpArrayArray(*this, other, res,
+																   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																   [](arrayType x, arrayType y)
 					{
 						return x + y;
 					});
@@ -861,14 +896,24 @@ namespace rapid
 			inline Array<arrayType, location> operator-(const Array<arrayType, location> &other) const
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				auto res = Array<arrayType, location>(shape);
-				Array<arrayType>::binaryOpArrayArray(*this, other, res,
-													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													 [](arrayType x, arrayType y)
+
+				if (location == CPU)
 				{
-					return x - y;
-				});
+					auto res = Array<arrayType, location>(shape);
+					Array<arrayType, location>::binaryOpArrayArray(*this, other, res,
+																   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																   [](arrayType x, arrayType y)
+					{
+						return x - y;
+					});
+					return res;
+				}
+
+			#ifdef RAPID_CUDA
+				auto res = Array<arrayType, location>(shape);
+				cuda::sub_array_array(math::prod(shape), dataStart, other.dataStart, res.dataStart);
 				return res;
+			#endif
 			}
 
 			/// <summary>
@@ -879,14 +924,24 @@ namespace rapid
 			inline Array<arrayType, location> operator*(const Array<arrayType, location> &other) const
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				auto res = Array<arrayType, location>(shape);
-				Array<arrayType>::binaryOpArrayArray(*this, other, res,
-													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													 [](arrayType x, arrayType y)
+
+				if (location == CPU)
 				{
-					return x * y;
-				});
+					auto res = Array<arrayType, location>(shape);
+					Array<arrayType, location>::binaryOpArrayArray(*this, other, res,
+																   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																   [](arrayType x, arrayType y)
+					{
+						return x * y;
+					});
+					return res;
+				}
+
+			#ifdef RAPID_CUDA
+				auto res = Array<arrayType, location>(shape);
+				cuda::mul_array_array(math::prod(shape), dataStart, other.dataStart, res.dataStart);
 				return res;
+			#endif
 			}
 
 			/// <summary>
@@ -897,14 +952,24 @@ namespace rapid
 			inline Array<arrayType, location> operator/(const Array<arrayType, location> &other) const
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				auto res = Array<arrayType, location>(shape);
-				Array<arrayType>::binaryOpArrayArray(*this, other, res,
-													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													 [](arrayType x, arrayType y)
+
+				if (location == CPU)
 				{
-					return x / y;
-				});
+					auto res = Array<arrayType, location>(shape);
+					Array<arrayType, location>::binaryOpArrayArray(*this, other, res,
+																   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																   [](arrayType x, arrayType y)
+					{
+						return x / y;
+					});
+					return res;
+				}
+
+			#ifdef RAPID_CUDA
+				auto res = Array<arrayType, location>(shape);
+				cuda::div_array_array(math::prod(shape), dataStart, other.dataStart, res.dataStart);
 				return res;
+			#endif
 			}
 
 			/// <summary>
@@ -916,14 +981,23 @@ namespace rapid
 			template<typename t>
 			inline Array<arrayType, location> operator+(const t &other) const
 			{
-				auto res = Array<arrayType, location>(shape);
-				Array<arrayType>::binaryOpArrayScalar(*this, (arrayType) other,
-													  res, math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													  [](arrayType x, arrayType y)
+				if (location == CPU)
 				{
-					return x + y;
-				});
+					auto res = Array<arrayType, location>(shape);
+					Array <arrayType, location> ::binaryOpArrayScalar(*this, (arrayType) other,
+																	  res, math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																	  [](arrayType x, arrayType y)
+					{
+						return x + y;
+					});
+					return res;
+				}
+
+			#ifdef RAPID_CUDA
+				auto res = Array<arrayType, location>(shape);
+				cuda::add_array_scalar(math::prod(shape), dataStart, (arrayType) other, res.dataStart);
 				return res;
+			#endif
 			}
 
 			/// <summary>
@@ -935,14 +1009,23 @@ namespace rapid
 			template<typename t>
 			inline Array<arrayType, location> operator-(const t &other) const
 			{
-				auto res = Array<arrayType, location>(shape);
-				Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
-													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													  [](arrayType x, arrayType y)
+				if (location == CPU)
 				{
-					return x - y;
-				});
+					auto res = Array<arrayType, location>(shape);
+					Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
+																	math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																	[](arrayType x, arrayType y)
+					{
+						return x - y;
+					});
+					return res;
+				}
+
+			#ifdef RAPID_CUDA
+				auto res = Array<arrayType, location>(shape);
+				cuda::sub_array_scalar(math::prod(shape), dataStart, (arrayType) other, res.dataStart);
 				return res;
+			#endif
 			}
 
 			/// <summary>
@@ -954,14 +1037,23 @@ namespace rapid
 			template<typename t>
 			inline Array<arrayType, location> operator*(const t &other) const
 			{
-				auto res = Array<arrayType>(shape);
-				Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
-													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													  [](arrayType x, arrayType y)
+				if (location == CPU)
 				{
-					return x * y;
-				});
+					auto res = Array<arrayType, location>(shape);
+					Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
+																	math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																	[](arrayType x, arrayType y)
+					{
+						return x * y;
+					});
+					return res;
+				}
+
+			#ifdef RAPID_CUDA
+				auto res = Array<arrayType, location>(shape);
+				cuda::mul_array_scalar(math::prod(shape), dataStart, (arrayType) other, res.dataStart);
 				return res;
+			#endif
 			}
 
 			/// <summary>
@@ -973,25 +1065,44 @@ namespace rapid
 			template<typename t>
 			inline Array<arrayType, location> operator/(const t &other) const
 			{
-				auto res = Array<arrayType, location>(shape);
-				Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
-													  math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													  [](arrayType x, arrayType y)
+				if (location == CPU)
 				{
-					return x / y;
-				});
+					auto res = Array<arrayType, location>(shape);
+					Array<arrayType, location>::binaryOpArrayScalar(*this, (arrayType) other, res,
+																	math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																	[](arrayType x, arrayType y)
+					{
+						return x / y;
+					});
+					return res;
+				}
+
+			#ifdef RAPID_CUDA
+				auto res = Array<arrayType, location>(shape);
+				cuda::div_array_scalar(math::prod(shape), dataStart, (arrayType) other, res.dataStart);
 				return res;
+			#endif
 			}
 
 			inline Array<arrayType, location> &operator+=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
-													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													 [](arrayType x, arrayType y)
+
+				if (location == CPU)
 				{
-					return x + y;
-				});
+					Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
+																   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																   [](arrayType x, arrayType y)
+					{
+						return x + y;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cuda::add_array_array(math::prod(shape), dataStart, other.dataStart, dataStart);
+				}
+			#endif
 
 				return *this;
 			}
@@ -999,12 +1110,22 @@ namespace rapid
 			inline Array<arrayType, location> &operator-=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
-													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													 [](arrayType x, arrayType y)
+
+				if (location == CPU)
 				{
-					return x - y;
-				});
+					Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
+																   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																   [](arrayType x, arrayType y)
+					{
+						return x - y;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cuda::sub_array_array(math::prod(shape), dataStart, other.dataStart, dataStart);
+				}
+			#endif
 
 				return *this;
 			}
@@ -1012,12 +1133,22 @@ namespace rapid
 			inline Array<arrayType, location> &operator*=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
-													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													 [](arrayType x, arrayType y)
+
+				if (location == CPU)
 				{
-					return x * y;
-				});
+					Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
+																   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																   [](arrayType x, arrayType y)
+					{
+						return x * y;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cuda::mul_array_array(math::prod(shape), dataStart, other.dataStart, dataStart);
+				}
+			#endif
 
 				return *this;
 			}
@@ -1025,12 +1156,106 @@ namespace rapid
 			inline Array<arrayType, location> &operator/=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Shapes must be equal to perform array addition");
-				Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
-													 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-													 [](arrayType x, arrayType y)
+
+				if (location == CPU)
 				{
-					return x / y;
-				});
+					Array<arrayType, location>::binaryOpArrayArray(*this, other, *this,
+																   math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																   [](arrayType x, arrayType y)
+					{
+						return x / y;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cuda::div_array_array(math::prod(shape), dataStart, other.dataStart, dataStart);
+				}
+			#endif
+
+				return *this;
+			}
+
+			inline Array<arrayType, location> &operator+=(const arrayType &other)
+			{
+				if (location == CPU)
+				{
+					Array<arrayType, location>::binaryOpArrayScalar(*this, other, *this,
+																	math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																	[](arrayType x, arrayType y)
+					{
+						return x + y;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cuda::add_array_scalar(math::prod(shape), dataStart, other, dataStart);
+				}
+			#endif
+
+				return *this;
+			}
+
+			inline Array<arrayType, location> &operator-=(const arrayType &other)
+			{
+				if (location == CPU)
+				{
+					Array<arrayType, location>::binaryOpArrayScalar(*this, other, *this,
+																	math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																	[](arrayType x, arrayType y)
+					{
+						return x - y;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cuda::sub_array_scalar(math::prod(shape), dataStart, other, dataStart);
+				}
+			#endif
+
+				return *this;
+			}
+
+			inline Array<arrayType, location> &operator*=(const arrayType &other)
+			{
+				if (location == CPU)
+				{
+					Array<arrayType, location>::binaryOpArrayScalar(*this, other, *this,
+																	math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																	[](arrayType x, arrayType y)
+					{
+						return x * y;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cuda::mul_array_scalar(math::prod(shape), dataStart, other, dataStart);
+				}
+			#endif
+
+				return *this;
+			}
+
+			inline Array<arrayType, location> &operator/=(const arrayType &other)
+			{
+				if (location == CPU)
+				{
+					Array<arrayType, location>::binaryOpArrayScalar(*this, other, *this,
+																	math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+																	[](arrayType x, arrayType y)
+					{
+						return x / y;
+					});
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cuda::div_array_scalar(math::prod(shape), dataStart, other, dataStart);
+				}
+			#endif
 
 				return *this;
 			}
@@ -1068,221 +1293,274 @@ namespace rapid
 			/// </summary>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			inline Array<arrayType> dot(const Array<arrayType> &other) const
+			inline Array<arrayType, location> dot(const Array<arrayType, location> &other) const
 			{
 				rapidAssert(shape.size() == other.shape.size(), "Invalid number of dimensions for array dot math::product");
 				uint64_t dims = shape.size();
 
-			#ifndef RAPID_NO_BLAS
-				switch (dims)
+				if (location == CPU)
 				{
-					case 1:
-						{
-							rapidAssert(shape[0] == other.shape[0], "Invalid shape for array math::product");
-							rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array math::product");
-
-							Array<arrayType> res(shape);
-							res.isZeroDim = true;
-							res.dataStart[0] = imp::rapid_dot(shape[0], dataStart, other.dataStart);
-
-							return res;
-						}
-					case 2:
-						{
-							rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot math::product");
-
-							Array<arrayType> res({shape[0], other.shape[1]});
-
-							const size_t M = shape[0];
-							const size_t N = shape[1];
-							const size_t K = other.shape[1];
-
-							const arrayType *__restrict a = dataStart;
-							const arrayType *__restrict b = other.dataStart;
-							arrayType *__restrict c = res.dataStart;
-
-							imp::rapid_gemm(M, N, K, a, b, c);
-
-							return res;
-						}
-					default:
-						{
-							std::vector<uint64_t> resShape = shape;
-							resShape[resShape.size() - 2] = shape[shape.size() - 2];
-							resShape[resShape.size() - 1] = other.shape[other.shape.size() - 1];
-							Array<arrayType> res(resShape);
-
-							for (uint64_t i = 0; i < shape[0]; i++)
+				#ifndef RAPID_NO_BLAS
+					switch (dims)
+					{
+						case 1:
 							{
-								res[i] = (operator[](i).dot(other[i]));
-							}
+								rapidAssert(shape[0] == other.shape[0], "Invalid shape for array math::product");
+								rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array math::product");
 
-							return res;
-						}
+								Array<arrayType, location> res(shape);
+								res.isZeroDim = true;
+								res.dataStart[0] = imp::rapid_dot(shape[0], dataStart, other.dataStart);
+
+								return res;
+							}
+						case 2:
+							{
+								rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot math::product");
+
+								Array<arrayType, location> res({shape[0], other.shape[1]});
+
+								const size_t M = shape[0];
+								const size_t N = shape[1];
+								const size_t K = other.shape[1];
+
+								const arrayType *__restrict a = dataStart;
+								const arrayType *__restrict b = other.dataStart;
+								arrayType *__restrict c = res.dataStart;
+
+								imp::rapid_gemm(M, N, K, a, b, c);
+
+								return res;
+							}
+						default:
+							{
+								std::vector<uint64_t> resShape = shape;
+								resShape[resShape.size() - 2] = shape[shape.size() - 2];
+								resShape[resShape.size() - 1] = other.shape[other.shape.size() - 1];
+								Array<arrayType, location> res(resShape);
+
+								for (uint64_t i = 0; i < shape[0]; i++)
+								{
+									res[i] = (operator[](i).dot(other[i]));
+								}
+
+								return res;
+							}
+					}
+				#else
+					switch (dims)
+					{
+						case 1:
+							{
+								rapidAssert(shape[0] == other.shape[0], "Invalid shape for array math::product");
+								rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array math::product");
+
+								Array<arrayType, location> res({1});
+								res.isZeroDim = true;
+								res.dataStart[0] = 0;
+
+								for (uint64_t i = 0; i < shape[0]; i++)
+									res.dataStart[0] += dataStart[i] * other.dataStart[i];
+
+								return res;
+							}
+						case 2:
+							{
+								rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot math::product");
+								uint64_t mode;
+								uint64_t size = shape[0] * shape[1] * other.shape[1];
+
+								if (size < 8000) mode = 0;
+								else if (size < 64000000) mode = 1;
+							#ifndef RAPID_NO_AMP
+								else mode = 2;
+							#else
+								else mode = 1;
+							#endif
+
+								Array<arrayType, location> res({shape[0], other.shape[1]});
+
+								if (mode == 0)
+								{
+									// Serial
+
+									size_t M = shape[0];
+									size_t N = shape[1];
+									size_t K = other.shape[1];
+
+									const arrayType *__restrict a = dataStart;
+									const arrayType *__restrict b = other.dataStart;
+									arrayType *__restrict c = res.dataStart;
+
+									size_t i, j, k;
+									arrayType tmp;
+
+									for (i = 0; i < M; ++i)
+									{
+										for (j = 0; j < K; ++j)
+										{
+											tmp = 0;
+
+											for (k = 0; k < N; ++k)
+												tmp += a[k + i * N] * b[j + k * K];
+
+											c[j + i * K] = tmp;
+										}
+									}
+								}
+								else if (mode == 1)
+								{
+									// Parallel
+
+									auto M = (long long) shape[0];
+									auto N = (long long) shape[1];
+									auto K = (long long) other.shape[1];
+
+									const arrayType *__restrict a = dataStart;
+									const arrayType *__restrict b = other.dataStart;
+									arrayType *__restrict c = res.dataStart;
+
+									long long i, j, k;
+									arrayType tmp;
+
+								#pragma omp parallel for shared(M, N, K, a, b, c) private(i, j, k, tmp) default(none)
+									for (i = 0; i < M; ++i)
+									{
+										for (j = 0; j < K; ++j)
+										{
+											tmp = 0;
+
+											for (k = 0; k < N; ++k)
+												tmp += a[k + i * N] * b[j + k * K];
+
+											c[j + i * K] = tmp;
+										}
+									}
+								}
+							#ifndef RAPID_NO_AMP
+								else if (mode == 2)
+								{
+									// Massive parallel
+
+									// Tile size
+									static const int TS = 32;
+
+									const auto resizedThis = internal_resized({rapid::roundUp(shape[0], (size_t) TS),
+																			  rapid::roundUp(shape[1], (size_t) TS)});
+									const auto resizedOther = internal_resized({rapid::roundUp(other.shape[0], (size_t) TS),
+																			   rapid::roundUp(other.shape[1], (size_t) TS)});
+									res.internal_resize({rapid::roundUp(shape[0], (size_t) TS),
+														rapid::roundUp(other.shape[1], (size_t) TS)});
+
+									auto M = (unsigned int) resizedThis.shape[0];
+									auto N = (unsigned int) resizedThis.shape[1];
+									auto K = (unsigned int) res.shape[1];
+
+									array_view<const arrayType, 2> a(M, N, resizedThis.dataStart);
+									array_view<const arrayType, 2> b(N, K, resizedOther.dataStart);
+									array_view<arrayType, 2> math::product(M, K, res.dataStart);
+
+									parallel_for_each(math::product.extent.tile<TS, TS>(), [=](tiled_index<TS, TS> t_idx) restrict(amp)
+									{
+										// Get the location of the thread relative to the tile (row, col)
+										// and the entire array_view (rowGlobal, colGlobal).
+										const int row = t_idx.local[0];
+										const int col = t_idx.local[1];
+										const int rowGlobal = t_idx.global[0];
+										const int colGlobal = t_idx.global[1];
+										arrayType sum = 0;
+
+										for (int i = 0; i < M; i += TS)
+										{
+											tile_static arrayType locA[TS][TS];
+											tile_static arrayType locB[TS][TS];
+											locA[row][col] = a(rowGlobal, col + i);
+											locB[row][col] = b(row + i, colGlobal);
+
+											t_idx.barrier.wait();
+
+											for (int k = 0; k < TS; k++)
+												sum += locA[row][k] * locB[k][col];
+
+											t_idx.barrier.wait();
+										}
+
+										math::product[t_idx.global] = sum;
+									});
+
+									math::product.synchronize();
+
+									res.internal_resize({shape[0], other.shape[1]});
+								}
+							#endif
+
+								return res;
+							}
+						default:
+							{
+								std::vector<uint64_t> resShape = shape;
+								resShape[resShape.size() - 2] = shape[shape.size() - 2];
+								resShape[resShape.size() - 1] = other.shape[other.shape.size() - 1];
+								Array<arrayType, location> res(resShape);
+
+								for (uint64_t i = 0; i < shape[0]; i++)
+								{
+									res[i] = (operator[](i).dot(other[i]));
+								}
+
+								return res;
+							}
+					}
+				#endif
 				}
-			#else
-				switch (dims)
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
 				{
-					case 1:
-						{
-							rapidAssert(shape[0] == other.shape[0], "Invalid shape for array math::product");
-							rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array math::product");
+				cudaSafeCall(cudaDeviceSynchronize());
 
-							Array<arrayType> res({1});
-							res.isZeroDim = true;
-							res.dataStart[0] = 0;
-
-							for (uint64_t i = 0; i < shape[0]; i++)
-								res.dataStart[0] += dataStart[i] * other.dataStart[i];
-
-							return res;
-						}
-					case 2:
-						{
-							rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot math::product");
-							uint64_t mode;
-							uint64_t size = shape[0] * shape[1] * other.shape[1];
-
-							if (size < 8000) mode = 0;
-							else if (size < 64000000) mode = 1;
-						#ifndef RAPID_NO_AMP
-							else mode = 2;
-						#else
-							else mode = 1;
-						#endif
-
-							Array<arrayType> res({shape[0], other.shape[1]});
-
-							if (mode == 0)
+					switch (dims)
+					{
+						case 1:
 							{
-								// Serial
+								rapidAssert(shape[0] == other.shape[0], "Invalid shape for array math::product");
+								rapidAssert(isZeroDim == other.isZeroDim, "Invalid value for array math::product");
 
-								size_t M = shape[0];
-								size_t N = shape[1];
-								size_t K = other.shape[1];
+								Array<arrayType, location> res({1});
+								res.isZeroDim = true;
+								
+								cuda::dot(1, shape[0], other.shape[0], dataStart, other.dataStart, res.dataStart);
 
-								const arrayType *__restrict a = dataStart;
-								const arrayType *__restrict b = other.dataStart;
-								arrayType *__restrict c = res.dataStart;
+								return res;
+							}
+						case 2:
+							{
+								rapidAssert(shape[1] == other.shape[0], "Columns of A must match rows of B for dot math::product");
 
-								size_t i, j, k;
-								arrayType tmp;
+								Array<arrayType, location> res({shape[0], other.shape[1]});
 
-								for (i = 0; i < M; ++i)
+								uint64_t m = shape[0];
+								uint64_t n = shape[1];
+								uint64_t k = other.shape[1];
+
+								cuda::dot(m, n, k, dataStart, other.dataStart, res.dataStart);
+
+								return res;
+							}
+						default:
+							{
+								std::vector<uint64_t> resShape = shape;
+								resShape[resShape.size() - 2] = shape[shape.size() - 2];
+								resShape[resShape.size() - 1] = other.shape[other.shape.size() - 1];
+								Array<arrayType, location> res(resShape);
+
+								for (uint64_t i = 0; i < shape[0]; i++)
 								{
-									for (j = 0; j < K; ++j)
-									{
-										tmp = 0;
-
-										for (k = 0; k < N; ++k)
-											tmp += a[k + i * N] * b[j + k * K];
-
-										c[j + i * K] = tmp;
-									}
+									res[i] = (operator[](i).dot(other[i]));
 								}
+
+								return res;
 							}
-							else if (mode == 1)
-							{
-								// Parallel
-
-								auto M = (long long) shape[0];
-								auto N = (long long) shape[1];
-								auto K = (long long) other.shape[1];
-
-								const arrayType *__restrict a = dataStart;
-								const arrayType *__restrict b = other.dataStart;
-								arrayType *__restrict c = res.dataStart;
-
-								long long i, j, k;
-								arrayType tmp;
-
-							#pragma omp parallel for shared(M, N, K, a, b, c) private(i, j, k, tmp) default(none)
-								for (i = 0; i < M; ++i)
-								{
-									for (j = 0; j < K; ++j)
-									{
-										tmp = 0;
-
-										for (k = 0; k < N; ++k)
-											tmp += a[k + i * N] * b[j + k * K];
-
-										c[j + i * K] = tmp;
-									}
-								}
-							}
-						#ifndef RAPID_NO_AMP
-							else if (mode == 2)
-							{
-								// Massive parallel
-
-								// Tile size
-								static const int TS = 32;
-
-								const auto resizedThis = internal_resized({rapid::roundUp(shape[0], (size_t) TS),
-																		  rapid::roundUp(shape[1], (size_t) TS)});
-								const auto resizedOther = internal_resized({rapid::roundUp(other.shape[0], (size_t) TS),
-																		   rapid::roundUp(other.shape[1], (size_t) TS)});
-								res.internal_resize({rapid::roundUp(shape[0], (size_t) TS),
-													rapid::roundUp(other.shape[1], (size_t) TS)});
-
-								auto M = (unsigned int) resizedThis.shape[0];
-								auto N = (unsigned int) resizedThis.shape[1];
-								auto K = (unsigned int) res.shape[1];
-
-								array_view<const arrayType, 2> a(M, N, resizedThis.dataStart);
-								array_view<const arrayType, 2> b(N, K, resizedOther.dataStart);
-								array_view<arrayType, 2> math::product(M, K, res.dataStart);
-
-								parallel_for_each(math::product.extent.tile<TS, TS>(), [=](tiled_index<TS, TS> t_idx) restrict(amp)
-								{
-									// Get the location of the thread relative to the tile (row, col)
-									// and the entire array_view (rowGlobal, colGlobal).
-									const int row = t_idx.local[0];
-									const int col = t_idx.local[1];
-									const int rowGlobal = t_idx.global[0];
-									const int colGlobal = t_idx.global[1];
-									arrayType sum = 0;
-
-									for (int i = 0; i < M; i += TS)
-									{
-										tile_static arrayType locA[TS][TS];
-										tile_static arrayType locB[TS][TS];
-										locA[row][col] = a(rowGlobal, col + i);
-										locB[row][col] = b(row + i, colGlobal);
-
-										t_idx.barrier.wait();
-
-										for (int k = 0; k < TS; k++)
-											sum += locA[row][k] * locB[k][col];
-
-										t_idx.barrier.wait();
-									}
-
-									math::product[t_idx.global] = sum;
-								});
-
-								math::product.synchronize();
-
-								res.internal_resize({shape[0], other.shape[1]});
-							}
-						#endif
-
-							return res;
-						}
-					default:
-						{
-							std::vector<uint64_t> resShape = shape;
-							resShape[resShape.size() - 2] = shape[shape.size() - 2];
-							resShape[resShape.size() - 1] = other.shape[other.shape.size() - 1];
-							Array<arrayType> res(resShape);
-
-							for (uint64_t i = 0; i < shape[0]; i++)
-							{
-								res[i] = (operator[](i).dot(other[i]));
-							}
-
-							return res;
-						}
+					}
 				}
 			#endif
 			}
@@ -1597,8 +1875,8 @@ namespace rapid
 		{
 			auto res = Array<t, loc>(other.shape);
 			Array<t, loc>::binaryOpScalarArray(val, other, res,
-										  math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-										  [](t x, t y)
+											   math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+											   [](t x, t y)
 			{
 				return x + y;
 			});
@@ -1617,8 +1895,8 @@ namespace rapid
 		{
 			auto res = Array<t, loc>(other.shape);
 			Array<t, loc>::binaryOpScalarArray(val, other, res,
-										  math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-										  [](t x, t y)
+											   math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+											   [](t x, t y)
 			{
 				return x - y;
 			});
@@ -1637,8 +1915,8 @@ namespace rapid
 		{
 			auto res = Array<t, loc>(other.shape);
 			Array<t, loc>::binaryOpScalarArray(val, other, res,
-										  math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-										  [](t x, t y)
+											   math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+											   [](t x, t y)
 			{
 				return x * y;
 			});
@@ -1657,8 +1935,8 @@ namespace rapid
 		{
 			auto res = Array<t, loc>(other.shape);
 			Array<t, loc>::binaryOpScalarArray(val, other, res,
-										  math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-										  [](t x, t y)
+											   math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+											   [](t x, t y)
 			{
 				return x / y;
 			});
