@@ -85,7 +85,7 @@ namespace rapid
 				indexT sig = 1;
 				indexT pos = 0;
 
-				for (indexT i = shape.size(); i >= 1; i--)
+				for (indexT i = shape.size(); i > 0; i--)
 				{
 					pos += (i - 1 < index.size() ? index[i - 1] : 0) * sig;
 					sig *= shape[i - 1];
@@ -109,11 +109,13 @@ namespace rapid
 			{
 				indexT sig = 1;
 				indexT pos = 0;
+				uint64_t off;
 
 				for (indexT i = shape.size(); i > 0; i--)
 				{
-					pos += (i - 1 < index.size() ? (*(index.begin() + i - 1)) : 0) * sig;
-					sig *= shape[i - 1];
+					off = i - 1;
+					pos += (i - 1 < index.size() ? (*(index.begin() + off)) : 0) * sig;
+					sig *= shape[off];
 				}
 
 				return pos;
@@ -177,6 +179,11 @@ namespace rapid
 			arrayType *dataStart;
 			size_t *originCount;
 			bool isZeroDim;
+
+		#ifdef RAPID_CUDA
+			bool useMatrixStride = false;
+			uint64_t matrixStride = 0;
+		#endif
 
 			/// <summary>
 			/// Apply a lambda function to two arrays, storing the result in a third.
@@ -478,6 +485,11 @@ namespace rapid
 
 				dataStart = other.dataStart;
 				dataOrigin = other.dataOrigin;
+
+			#ifdef RAPID_CUDA
+				useMatrixStride = other.useMatrixStride;
+				matrixStride = other.matrixStride;
+			#endif
 
 				originCount = other.originCount;
 				(*originCount)++;
@@ -833,7 +845,7 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <param name="index"></param>
 			/// <param name="val"></param>
-			template<typename t, ArrayLocation loc>
+			template<typename t>
 			inline void setVal(const std::initializer_list<t> &index, const arrayType &val) const
 			{
 				rapidAssert(index.size() == shape.size(), "Invalid number of dimensions to access");
@@ -845,7 +857,12 @@ namespace rapid
 				}
 			#endif
 
-				dataStart[utils::ndToScalar(index, shape)] = val;
+				if (location == CPU)
+					dataStart[utils::ndToScalar(index, shape)] = val;
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+					cudaSafeCall(cudaMemcpy(dataStart + utils::ndToScalar(index, shape), &val, sizeof(arrayType), cudaMemcpyHostToDevice));
+			#endif
 			}
 
 			inline Array<arrayType, location> operator-() const
@@ -1545,51 +1562,48 @@ namespace rapid
 								arrayType dotAlpha = 1;
 								arrayType dotBeta = 0;
 
-// 								arrayType *tempThis;
-// 								cudaSafeCall(cudaMalloc(&tempThis, sizeof(arrayType) * math::prod(shape)));
-// 								cublasSafeCall(cublasSgeam(handle::handle,
-// 											   CUBLAS_OP_T, CUBLAS_OP_T,
-// 											   m, n,
-// 											   &dotAlpha,
-// 											   dataStart, n,
-// 											   &dotBeta,
-// 											   dataStart, n,
-// 											   tempThis, m));
-// 
-// 								arrayType *tempOther;
-// 								cudaSafeCall(cudaMalloc(&tempOther, sizeof(arrayType) * math::prod(other.shape)));
-// 								cublasSafeCall(cublasSgeam(handle::handle,
-// 											   CUBLAS_OP_T, CUBLAS_OP_T,
-// 											   n, k,
-// 											   &dotAlpha,
-// 											   other.dataStart, k,
-// 											   &dotBeta,
-// 											   other.dataStart, k,
-// 											   tempOther, n));
-// 
-// 								arrayType *tempRes;
-// 								cudaSafeCall(cudaMalloc(&tempRes, sizeof(arrayType) * math::prod(res.shape)));
-// 
-// 								// cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, tempThis, m, tempOther, n, &dotBeta, res.dataStart, m);
-// 								cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, tempThis, m, tempOther, n, &dotBeta, tempRes, m);
-// 
-// 								cudaSafeCall(cudaFree(tempThis));
-// 								cudaSafeCall(cudaFree(tempOther));
-// 
-// 								cudaSafeCall(cudaDeviceSynchronize());
-// 
-// 								cublasSafeCall(cublasSgeam(handle::handle,
-// 											   CUBLAS_OP_T, CUBLAS_OP_T,
-// 											   m, k,
-// 											   &dotAlpha,
-// 											   tempRes, k,
-// 											   &dotBeta,
-// 											   tempRes, k,
-// 											   res.dataStart, n));
-// 
-// 								cudaSafeCall(cudaFree(tempRes));
+								arrayType *tempThis;
+								cudaSafeCall(cudaMalloc(&tempThis, sizeof(arrayType) * math::prod(shape)));
+								cublasSafeCall(cublasSgeam(handle::handle,
+											   CUBLAS_OP_T, CUBLAS_OP_T,
+											   m, n,
+											   &dotAlpha,
+											   dataStart, n,
+											   &dotBeta,
+											   dataStart, n,
+											   tempThis, m));
 
-								cuda::dot(m, n, k, dataStart, other.dataStart, res.dataStart);
+								arrayType *tempOther;
+								cudaSafeCall(cudaMalloc(&tempOther, sizeof(arrayType) * math::prod(other.shape)));
+								cublasSafeCall(cublasSgeam(handle::handle,
+											   CUBLAS_OP_T, CUBLAS_OP_T,
+											   n, k,
+											   &dotAlpha,
+											   other.dataStart, k,
+											   &dotBeta,
+											   other.dataStart, k,
+											   tempOther, n));
+
+								arrayType *tempRes;
+								cudaSafeCall(cudaMalloc(&tempRes, sizeof(arrayType) * math::prod(res.shape)));
+
+								cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, tempThis, m, tempOther, n, &dotBeta, tempRes, m);
+
+								cudaSafeCall(cudaFree(tempThis));
+								cudaSafeCall(cudaFree(tempOther));
+
+								cudaSafeCall(cudaDeviceSynchronize());
+
+								cublasSafeCall(cublasSgeam(handle::handle,
+											   CUBLAS_OP_T, CUBLAS_OP_T,
+											   k, m,
+											   &dotAlpha,
+											   tempRes, m,
+											   &dotBeta,
+											   tempRes, m,
+											   res.dataStart, k));
+
+								cudaSafeCall(cudaFree(tempRes));
 
 								return res;
 							}
