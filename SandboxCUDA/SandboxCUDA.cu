@@ -62,10 +62,12 @@ int main()
 	std::cout << lhs.dot(rhs) << "\n\n";
 
 	rhs[1][1] = 12345;
+	rhs[0] = rapid::ndarray::Array<float, GPU>::fromData({123, 456});
 
 	std::cout << rhs << "\n\n";
 	std::cout << "Test: " << rhs[1][0] << "\n";
 
+	/*
 	{
 		std::cout << "Timing GPU<float>\n";
 		auto speedTestGPU = rapid::ndarray::Array<float, GPU>({1000, 1000});
@@ -86,17 +88,29 @@ int main()
 		std::cout << "Timing GPU<double>\n";
 		auto speedTestGPU = rapid::ndarray::Array<double, GPU>({1000, 1000});
 
-		START_TIMER(0, 10000);
+		START_TIMER(0, 1000);
 		auto res = speedTestGPU.dot(speedTestGPU);
 		END_TIMER(0);
 
 		std::cout << "Timing CPU<double>\n";
 		auto speedTestCPU = rapid::ndarray::Array<double, CPU>({1000, 1000});
 
-		START_TIMER(1, 1000);
+		START_TIMER(1, 100);
 		auto res = speedTestCPU.dot(speedTestCPU);
 		END_TIMER(1);
 	}
+	*/
+
+	std::cout << "\n\n\n\n\n";
+	auto a = rapid::ndarray::Array<float, GPU>({2, 2, 2});
+	a.fill(0);
+	auto b = rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
+
+	std::cout << a << "\n\n";
+	std::cout << b << "\n\n";
+
+	a[0] = b;
+	std::cout << a << "\n\n";
 
 	return 0;
 }

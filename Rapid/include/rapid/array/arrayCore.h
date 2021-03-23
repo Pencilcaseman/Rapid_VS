@@ -599,7 +599,17 @@ namespace rapid
 					memcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType));
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
-					cudaSafeCall(cudaMemcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType), cudaMemcpyDeviceToDevice));
+				{
+					if (useMatrixData)
+					{
+						for (uint64_t i = 0; i < other.shape[0]; i++)
+							cudaSafeCall(cudaMemcpy(dataStart + matrixAccess + i * matrixRows, other.dataStart + i, sizeof(arrayType), cudaMemcpyDeviceToDevice));
+					}
+					else
+					{
+						cudaSafeCall(cudaMemcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType), cudaMemcpyDeviceToDevice));
+					}
+				}
 			#endif
 
 			#ifdef RAPID_CUDA
@@ -808,7 +818,7 @@ namespace rapid
 				#endif
 					delete originCount;
 				}
-			}
+				}
 
 			/// <summary>
 			/// Cast a zero-dimensional array to a scalar value
@@ -857,7 +867,7 @@ namespace rapid
 				{
 					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
 					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
-																	originCount, isZeroDim);
+																originCount, isZeroDim);
 				}
 			#endif
 			}
@@ -2046,7 +2056,7 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <returns></returns>
 			std::string toString(uint64_t startDepth = 0) const;
-		};
+				};
 
 		template<typename t, ArrayLocation loc>
 		std::ostream &operator<<(std::ostream &os, const Array<t, loc> &arr)
@@ -2550,5 +2560,5 @@ namespace rapid
 
 			return res;
 		}
-	}
-}
+			}
+			}
