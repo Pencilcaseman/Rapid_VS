@@ -182,9 +182,15 @@ namespace rapid
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
+				t *resData;
+				cudaSafeCall(cudaMalloc(&resData, sizeof(t) * math::prod(shape)));
+
+				cuda::columnToRowOrdering(shape[0], shape[1], dataStart, resData);
+
 				cudaSafeCall(cudaDeviceSynchronize());
 				arrayData = new t[math::prod(shape)];
-				cudaSafeCall(cudaMemcpy(arrayData, dataStart, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
+				cudaSafeCall(cudaMemcpy(arrayData, resData, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
+				cudaSafeCall(cudaFree(resData));
 			}
 		#endif
 

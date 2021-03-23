@@ -43,9 +43,9 @@ int main()
 		END_TIMER(0);
 	}
 
-	auto chonkey = rapid::ndarray::Array<float>({1000, 1000});
+	auto chonkey = rapid::ndarray::Array<float>({5000, 5000});
 
-	START_TIMER(1, 1000);
+	START_TIMER(1, 1);
 	auto res = chonkey.dot(chonkey);
 	END_TIMER(1);
 

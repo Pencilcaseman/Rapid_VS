@@ -181,8 +181,9 @@ namespace rapid
 			bool isZeroDim;
 
 		#ifdef RAPID_CUDA
-			bool useMatrixStride = false;
-			uint64_t matrixStride = 0;
+			bool useMatrixData = false;
+			uint64_t matrixRows = 0;
+			uint64_t matrixAccess = 0;
 		#endif
 
 			/// <summary>
@@ -473,6 +474,12 @@ namespace rapid
 
 				originCount = new uint64_t;
 				*originCount = 1;
+
+			#ifdef RAPID_CUDA
+				useMatrixData = false;
+				matrixRows = 0;
+				matrixAccess = 0;
+			#endif
 			}
 
 			inline void set(const Array<arrayType> &other)
@@ -487,8 +494,9 @@ namespace rapid
 				dataOrigin = other.dataOrigin;
 
 			#ifdef RAPID_CUDA
-				useMatrixStride = other.useMatrixStride;
-				matrixStride = other.matrixStride;
+				useMatrixData = other.useMatrixData;
+				matrixRows = other.matrixRows;
+				matrixAccess = other.matrixAccess;
 			#endif
 
 				originCount = other.originCount;
@@ -547,6 +555,12 @@ namespace rapid
 					originCount = new size_t;
 					*originCount = 1;
 				}
+
+			#ifdef RAPID_CUDA
+				useMatrixData = false;
+				matrixRows = 0;
+				matrixAccess = 0;
+			#endif
 			}
 
 			/// <summary>
@@ -563,6 +577,12 @@ namespace rapid
 				dataStart = other.dataStart;
 				originCount = other.originCount;
 				(*originCount)++;
+
+			#ifdef RAPID_CUDA
+				useMatrixData = other.useMatrixData;
+				matrixRows = other.matrixRows;
+				matrixAccess = other.matrixAccess;
+			#endif
 			}
 
 			/// <summary>
@@ -581,6 +601,13 @@ namespace rapid
 				else if (location == GPU)
 					cudaSafeCall(cudaMemcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType), cudaMemcpyDeviceToDevice));
 			#endif
+
+			#ifdef RAPID_CUDA
+				useMatrixData = other.useMatrixData;
+				matrixRows = other.matrixRows;
+				matrixAccess = other.matrixAccess;
+			#endif
+
 				return *this;
 			}
 
@@ -590,7 +617,7 @@ namespace rapid
 			/// </summary>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			Array<arrayType> &operator=(const arrayType &other)
+			Array<arrayType, location> &operator=(const arrayType &other)
 			{
 				fill(other);
 				return *this;
@@ -667,8 +694,22 @@ namespace rapid
 			// Up to 20-dimensional array setting from data
 			imp_temp imp_func_def(L<L<t>>)
 			{
-				imp_func_body
+				auto res = Array<arrayType, location>(imp::extractShape(data));
+				uint64_t index = 0;
+				for (const auto &val : data)
+					res.pseudoBrackets(index++) = Array<arrayType, location>::fromData(val);
+
+				arrayType *resData;
+				cudaSafeCall(cudaMalloc(&resData, sizeof(arrayType) * math::prod(res.shape)));
+
+				cuda::rowToColumnOrdering(res.shape[0], res.shape[1], res.dataStart, resData);
+				cudaSafeCall(cudaDeviceSynchronize());
+				cudaSafeCall(cudaMemcpy(res.dataStart, resData, sizeof(arrayType) * math::prod(res.shape), cudaMemcpyDeviceToDevice));
+				cudaSafeCall(cudaFree(resData));
+
+				return res;
 			}
+
 			imp_temp imp_func_def(L<L<L<t>>>)
 			{
 				imp_func_body
@@ -793,6 +834,34 @@ namespace rapid
 			#endif
 			}
 
+			Array<arrayType, location> pseudoBrackets(const size_t &index) const
+			{
+				rapidAssert(index < shape[0], "Index out of range for array subscript");
+
+				(*originCount)++;
+
+				if (shape.size() == 1)
+				{
+					return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+																originCount, true);
+				}
+
+				if (location == CPU)
+				{
+					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+																originCount, isZeroDim);
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+																	originCount, isZeroDim);
+				}
+			#endif
+			}
+
 			/// <summary>
 			/// Access a subarray or value of an array. The result is linked
 			/// to the parent array, so an update in one will trigger an update
@@ -807,12 +876,50 @@ namespace rapid
 				(*originCount)++;
 
 				if (shape.size() == 1)
+				{
+				#ifdef RAPID_CUDA
+					if (useMatrixData)
+					{
+						return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + matrixAccess + index * matrixRows,
+																	originCount, true);
+					}
+					else
+					{
+						return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+																	originCount, true);
+					}
+				#endif
+
 					return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
 																originCount, true);
+				}
 
-				std::vector<size_t> resShape(shape.begin() + 1, shape.end());
-				return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
-															originCount, isZeroDim);
+				if (location == CPU)
+				{
+					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+																originCount, isZeroDim);
+				}
+			#ifdef RAPID_CUDA
+				else if (shape.size() == 2 && location == GPU)
+				{
+					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+					auto res = Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart, // + utils::ndToScalar({index}, shape), // dataStart,
+																	originCount, isZeroDim);
+
+					res.useMatrixData = true;
+					res.matrixRows = shape[0];
+					res.matrixAccess = index;
+
+					return res;
+				}
+				else
+				{
+					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+																originCount, isZeroDim);
+				}
+			#endif
 			}
 
 			/// <summary>
@@ -1562,48 +1669,51 @@ namespace rapid
 								arrayType dotAlpha = 1;
 								arrayType dotBeta = 0;
 
-								arrayType *tempThis;
-								cudaSafeCall(cudaMalloc(&tempThis, sizeof(arrayType) * math::prod(shape)));
-								cublasSafeCall(cublasSgeam(handle::handle,
-											   CUBLAS_OP_T, CUBLAS_OP_T,
-											   m, n,
-											   &dotAlpha,
-											   dataStart, n,
-											   &dotBeta,
-											   dataStart, n,
-											   tempThis, m));
-
-								arrayType *tempOther;
-								cudaSafeCall(cudaMalloc(&tempOther, sizeof(arrayType) * math::prod(other.shape)));
-								cublasSafeCall(cublasSgeam(handle::handle,
-											   CUBLAS_OP_T, CUBLAS_OP_T,
-											   n, k,
-											   &dotAlpha,
-											   other.dataStart, k,
-											   &dotBeta,
-											   other.dataStart, k,
-											   tempOther, n));
-
-								arrayType *tempRes;
-								cudaSafeCall(cudaMalloc(&tempRes, sizeof(arrayType) * math::prod(res.shape)));
-
-								cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, tempThis, m, tempOther, n, &dotBeta, tempRes, m);
-
-								cudaSafeCall(cudaFree(tempThis));
-								cudaSafeCall(cudaFree(tempOther));
+								// arrayType *tempThis;
+								// cudaSafeCall(cudaMalloc(&tempThis, sizeof(arrayType) * math::prod(shape)));
+								// cublasSafeCall(cublasSgeam(handle::handle,
+								// 			   CUBLAS_OP_T, CUBLAS_OP_T,
+								// 			   m, n,
+								// 			   &dotAlpha,
+								// 			   dataStart, n,
+								// 			   &dotBeta,
+								// 			   dataStart, n,
+								// 			   tempThis, m));
+								// 
+								// arrayType *tempOther;
+								// cudaSafeCall(cudaMalloc(&tempOther, sizeof(arrayType) * math::prod(other.shape)));
+								// cublasSafeCall(cublasSgeam(handle::handle,
+								// 			   CUBLAS_OP_T, CUBLAS_OP_T,
+								// 			   n, k,
+								// 			   &dotAlpha,
+								// 			   other.dataStart, k,
+								// 			   &dotBeta,
+								// 			   other.dataStart, k,
+								// 			   tempOther, n));
+								// 
+								// arrayType *tempRes;
+								// cudaSafeCall(cudaMalloc(&tempRes, sizeof(arrayType) * math::prod(res.shape)));
+								// 
+								// cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, tempThis, m, tempOther, n, &dotBeta, tempRes, m);
+								// 
+								// cudaSafeCall(cudaFree(tempThis));
+								// cudaSafeCall(cudaFree(tempOther));
+								// 
+								// cudaSafeCall(cudaDeviceSynchronize());
+								// 
+								// cublasSafeCall(cublasSgeam(handle::handle,
+								// 			   CUBLAS_OP_T, CUBLAS_OP_T,
+								// 			   k, m,
+								// 			   &dotAlpha,
+								// 			   tempRes, m,
+								// 			   &dotBeta,
+								// 			   tempRes, m,
+								// 			   res.dataStart, k));
+								// 
+								// cudaSafeCall(cudaFree(tempRes));
 
 								cudaSafeCall(cudaDeviceSynchronize());
-
-								cublasSafeCall(cublasSgeam(handle::handle,
-											   CUBLAS_OP_T, CUBLAS_OP_T,
-											   k, m,
-											   &dotAlpha,
-											   tempRes, m,
-											   &dotBeta,
-											   tempRes, m,
-											   res.dataStart, k));
-
-								cudaSafeCall(cudaFree(tempRes));
+								cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, dataStart, m, other.dataStart, n, &dotBeta, res.dataStart, m);
 
 								return res;
 							}
@@ -1634,132 +1744,182 @@ namespace rapid
 			/// </summary>
 			/// <param name="axes"></param>
 			/// <returns></returns>
-			inline Array<arrayType> transposed(const std::vector<uint64_t> &axes = std::vector<uint64_t>()) const
+			inline Array<arrayType, location> transposed(const std::vector<uint64_t> &axes = std::vector<uint64_t>(), bool dataOnly = false) const
 			{
-				if (axes.size() != shape.size())
-					message::RapidError("Transpose Error", "Invalid number of axes for array transpose").display();
-				for (uint64_t i = 0; i < axes.size(); i++)
-					if (std::count(axes.begin(), axes.end(), i) != 1)
-						message::RapidError("Transpose Error", "Dimension does not appear only once").display();
-
-				std::vector<uint64_t> newDims(shape.size());
-				if (axes.empty())
-					for (uint64_t i = 0; i < shape.size(); i++)
-						newDims[i] = shape[shape.size() - i - 1];
-				else
-					for (uint64_t i = 0; i < shape.size(); i++)
-						newDims[i] = shape[axes[i]];
-
-				// Edge case for 1D array
-				if (shape.size() == 1 || (axes.size() == 1 && axes[0] == 0))
+				if (!axes.empty())
 				{
-					auto res = Array<arrayType>(newDims);
-					memcpy(res.dataStart, dataStart, sizeof(arrayType) * math::prod(newDims));
-					return res;
+					if (axes.size() != shape.size())
+						message::RapidError("Transpose Error", "Invalid number of axes for array transpose").display();
+					for (uint64_t i = 0; i < axes.size(); i++)
+						if (std::count(axes.begin(), axes.end(), i) != 1)
+							message::RapidError("Transpose Error", "Dimension does not appear only once").display();
 				}
 
-				if (shape.size() == 2)
+				std::vector<uint64_t> newDims;
+
+				if (dataOnly)
 				{
-					auto res = Array<arrayType>(newDims);
+					newDims = std::vector<uint64_t>(shape.begin(), shape.end());
+				}
+				else
+				{
+					newDims = std::vector<uint64_t>(shape.size());
+					if (axes.empty())
+						for (uint64_t i = 0; i < shape.size(); i++)
+							newDims[i] = shape[shape.size() - i - 1];
+					else
+						for (uint64_t i = 0; i < shape.size(); i++)
+							newDims[i] = shape[axes[i]];
+				}
 
-					uint64_t rows = shape[0];
-					uint64_t cols = shape[1];
-
-					if (rows * cols < 62500)
+				if (location == CPU)
+				{
+					// Edge case for 1D array
+					if (shape.size() == 1 || (axes.size() == 1 && axes[0] == 0))
 					{
-						for (uint64_t i = 0; i < rows; i++)
+						auto res = Array<arrayType, location>(newDims);
+						memcpy(res.dataStart, dataStart, sizeof(arrayType) * math::prod(newDims));
+						return res;
+					}
+
+					if (shape.size() == 2)
+					{
+						auto res = Array<arrayType, location>(newDims);
+
+						uint64_t rows = shape[0];
+						uint64_t cols = shape[1];
+
+						if (rows * cols < 62500)
 						{
-							for (uint64_t j = 0; j < cols; j++)
+							for (uint64_t i = 0; i < rows; i++)
 							{
-								res.dataStart[i + j * rows] = dataStart[j + i * cols];
+								for (uint64_t j = 0; j < cols; j++)
+								{
+									res.dataStart[i + j * rows] = dataStart[j + i * cols];
+								}
+							}
+						}
+						else
+						{
+							int64_t i = 0, j = 0;
+							const arrayType *__restrict thisData = dataStart;
+							arrayType *__restrict resData = res.dataStart;
+							auto minCols = rapid::math::max(cols, 3) - 3;
+
+						#pragma omp parallel for private(i, j) shared(resData, thisData, minCols) default(none) num_threads(8)
+							for (i = 0; i < rows; i++)
+							{
+								for (j = 0; j < minCols; j++)
+								{
+									int64_t p1 = i + j * rows;
+									int64_t p2 = j + i * cols;
+
+									resData[p1 + 0] = thisData[p2 + 0];
+									resData[p1 + 1] = thisData[p2 + 1];
+									resData[p1 + 2] = thisData[p2 + 2];
+									resData[p1 + 3] = thisData[p2 + 3];
+								}
+
+								for (; j < cols; j++)
+									resData[i + j * rows] = thisData[+i * cols];
+							}
+						}
+
+						return res;
+					}
+
+					auto res = Array<arrayType, location>(newDims);
+
+					std::vector<uint64_t> indices(shape.size(), 0);
+					std::vector<uint64_t> indicesRes(shape.size(), 0);
+
+					if (math::prod(shape) < 62000)
+					{
+						for (uint64_t i = 0; i < math::prod(shape); i++)
+						{
+							if (axes.empty())
+								for (uint64_t j = 0; j < shape.size(); j++)
+									indicesRes[j] = indices[shape.size() - j - 1];
+							else
+								for (uint64_t j = 0; j < shape.size(); j++)
+									indicesRes[j] = indices[axes[j]];
+
+							res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(shape, indices)];
+
+							indices[shape.size() - 1]++;
+							uint64_t index = shape.size() - 1;
+
+							while (indices[index] >= shape[index] && index > 0)
+							{
+								indices[index] = 0;
+								index--;
+								indices[index]++;
 							}
 						}
 					}
 					else
 					{
-						int64_t i = 0, j = 0;
-						const arrayType *__restrict thisData = dataStart;
-						arrayType *__restrict resData = res.dataStart;
-						auto minCols = rapid::math::max(cols, 3) - 3;
-
-					#pragma omp parallel for private(i, j) shared(resData, thisData, minCols) default(none) num_threads(8)
-						for (i = 0; i < rows; i++)
+						auto tmpShape = shape;
+						for (int64_t i = 0; i < math::prod(tmpShape); i++)
 						{
-							for (j = 0; j < minCols; j++)
+							if (axes.empty())
+								for (int64_t j = 0; j < tmpShape.size(); j++)
+									indicesRes[j] = indices[tmpShape.size() - j - 1];
+							else
+								for (int64_t j = 0; j < tmpShape.size(); j++)
+									indicesRes[j] = indices[axes[j]];
+
+							res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(tmpShape, indices)];
+
+							indices[tmpShape.size() - 1]++;
+							int64_t index = tmpShape.size() - 1;
+
+							while (indices[index] >= tmpShape[index] && index > 0)
 							{
-								int64_t p1 = i + j * rows;
-								int64_t p2 = j + i * cols;
-
-								resData[p1 + 0] = thisData[p2 + 0];
-								resData[p1 + 1] = thisData[p2 + 1];
-								resData[p1 + 2] = thisData[p2 + 2];
-								resData[p1 + 3] = thisData[p2 + 3];
+								indices[index] = 0;
+								index--;
+								indices[index]++;
 							}
-
-							for (; j < cols; j++)
-								resData[i + j * rows] = thisData[+i * cols];
 						}
 					}
 
 					return res;
 				}
-
-				auto res = Array<arrayType>(newDims);
-
-				std::vector<uint64_t> indices(shape.size(), 0);
-				std::vector<uint64_t> indicesRes(shape.size(), 0);
-
-				if (math::prod(shape) < 62000)
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
 				{
-					for (uint64_t i = 0; i < math::prod(shape); i++)
+					if (shape.size() == 2)
 					{
-						if (axes.empty())
-							for (uint64_t j = 0; j < shape.size(); j++)
-								indicesRes[j] = indices[shape.size() - j - 1];
-						else
-							for (uint64_t j = 0; j < shape.size(); j++)
-								indicesRes[j] = indices[axes[j]];
+						uint64_t m = shape[0];
+						uint64_t n = shape[1];
 
-						res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(shape, indices)];
+						auto res = Array<arrayType, location>(newDims);
 
-						indices[shape.size() - 1]++;
-						uint64_t index = shape.size() - 1;
+						arrayType alpha = 1;
+						arrayType beta = 0;
 
-						while (indices[index] >= shape[index] && index > 0)
-						{
-							indices[index] = 0;
-							index--;
-							indices[index]++;
-						}
+						arrayType *tempRes;
+
+						cudaSafeCall(cudaDeviceSynchronize());
+						cudaSafeCall(cudaMalloc(&tempRes, sizeof(arrayType) * math::prod(shape)));
+						cublasSafeCall(cublasSgeam(handle::handle,
+									   CUBLAS_OP_T, CUBLAS_OP_T,
+									   m, n,
+									   &alpha,
+									   dataStart, n,
+									   &beta,
+									   dataStart, n,
+									   tempRes, m));
+
+						cudaSafeCall(cudaDeviceSynchronize());
+						cudaSafeCall(cudaMemcpy(res.dataStart, tempRes, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToDevice));
+
+						return res;
 					}
 				}
-				else
-				{
-					auto tmpShape = shape;
-					for (int64_t i = 0; i < math::prod(tmpShape); i++)
-					{
-						if (axes.empty())
-							for (int64_t j = 0; j < tmpShape.size(); j++)
-								indicesRes[j] = indices[tmpShape.size() - j - 1];
-						else
-							for (int64_t j = 0; j < tmpShape.size(); j++)
-								indicesRes[j] = indices[axes[j]];
+			#endif
 
-						res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(tmpShape, indices)];
-
-						indices[tmpShape.size() - 1]++;
-						int64_t index = tmpShape.size() - 1;
-
-						while (indices[index] >= tmpShape[index] && index > 0)
-						{
-							indices[index] = 0;
-							index--;
-							indices[index]++;
-						}
-					}
-				}
-
-				return res;
+				return Array<arrayType, location>({0, 0});
 			}
 
 		#define AUTO ((uint64_t) -1)

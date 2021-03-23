@@ -30,6 +30,66 @@ namespace rapid
 				}
 
 				__global__
+					void rowToColumnOrdering_float(uint64_t rows, uint64_t cols, const float *arr, float *res)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < rows * cols; i += stride)
+					{
+						uint64_t row = i / cols;
+						uint64_t col = i % cols;
+
+						res[row + col * rows] = arr[col + row * cols];
+					}
+				}
+
+				__global__
+					void rowToColumnOrdering_double(uint64_t rows, uint64_t cols, const double *arr, double *res)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < rows * cols; i += stride)
+					{
+						uint64_t row = i / cols;
+						uint64_t col = i % cols;
+
+						res[row + col * rows] = arr[col + row * cols];
+					}
+				}
+
+				__global__
+					void columnToRowOrdering_float(uint64_t rows, uint64_t cols, const float *arr, float *res)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < rows * cols; i += stride)
+					{
+						uint64_t row = i / cols;
+						uint64_t col = i % cols;
+
+						res[col + row * cols] = arr[row + col * rows];
+					}
+				}
+
+				__global__
+					void columnToRowOrdering_double(uint64_t rows, uint64_t cols, const double *arr, double *res)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < rows * cols; i += stride)
+					{
+						uint64_t row = i / cols;
+						uint64_t col = i % cols;
+
+						res[col + row * cols] = arr[row + col * rows];
+					}
+				}
+
+				__global__
 					void fill_float(uint64_t size, float *arr, float val)
 				{
 					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -287,6 +347,54 @@ namespace rapid
 					cudaSafeCall(cudaDeviceSynchronize());
 
 				kernel::printStuff_float << <numBlocks, blockSize >> > (size, arr);
+			}
+
+			inline void rowToColumnOrdering(uint64_t rows, uint64_t cols, float *arr, float *res, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (rows * cols + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::rowToColumnOrdering_float << <numBlocks, blockSize >> > (rows, cols, arr, res);
+			}
+
+			inline void rowToColumnOrdering(uint64_t rows, uint64_t cols, double *arr, double *res, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (rows * cols + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::rowToColumnOrdering_double << <numBlocks, blockSize >> > (rows, cols, arr, res);
+			}
+
+			inline void columnToRowOrdering(uint64_t rows, uint64_t cols, float *arr, float *res, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (rows * cols + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::columnToRowOrdering_float << <numBlocks, blockSize >> > (rows, cols, arr, res);
+			}
+
+			inline void columnToRowOrdering(uint64_t rows, uint64_t cols, double *arr, double *res, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (rows * cols + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::columnToRowOrdering_double << <numBlocks, blockSize >> > (rows, cols, arr, res);
 			}
 
 			inline void fill(uint64_t size, float *arr, float val, int sync = 1)
