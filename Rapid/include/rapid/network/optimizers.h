@@ -88,8 +88,8 @@ namespace rapid
 			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
 			struct OptimOutput
 			{
-				ndarray::Array<_Ty, ndarray::CPU> weight;
-				Config<_Ty> config;
+				ndarray::Array<_Ty, loc> weight;
+				Config<_Ty, loc> config;
 			};
 
 			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
@@ -97,13 +97,13 @@ namespace rapid
 			{
 			public:
 				virtual inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
-													  const ndarray::Array<_Ty, loc> &dw,
-													  Config<_Ty> &config) = 0;
+														   const ndarray::Array<_Ty, loc> &dw,
+														   Config<_Ty, loc> &config) = 0;
 
 				virtual inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
-													  const ndarray::Array<_Ty, loc> &dw) = 0;
+														   const ndarray::Array<_Ty, loc> &dw) = 0;
 			};
-			
+
 			/// <summary>
 			/// Vanilla stochastic gradient descent
 			/// </summary>
@@ -115,8 +115,8 @@ namespace rapid
 				sgd() = default;
 
 				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
-											  const ndarray::Array<_Ty, loc> &dw,
-											  Config<_Ty> &config) override
+												   const ndarray::Array<_Ty, loc> &dw,
+												   Config<_Ty, loc> &config) override
 				{
 					if (config.initialized == 0)
 					{
@@ -130,7 +130,7 @@ namespace rapid
 				}
 
 				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
-											  const ndarray::Array<_Ty, loc> &dw) override
+												   const ndarray::Array<_Ty, loc> &dw) override
 				{
 					Config<_Ty, loc> config;
 					config.initialized = 1;
@@ -151,8 +151,8 @@ namespace rapid
 				sgdMomentum() = default;
 
 				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
-											  const ndarray::Array<_Ty, loc> &dw,
-											  Config<_Ty, loc> &config) override
+												   const ndarray::Array<_Ty, loc> &dw,
+												   Config<_Ty, loc> &config) override
 				{
 					if (config.initialized == 0)
 					{
@@ -172,7 +172,7 @@ namespace rapid
 				}
 
 				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &w,
-											  const ndarray::Array<_Ty, loc> &dw) override
+												   const ndarray::Array<_Ty, loc> &dw) override
 				{
 					Config<_Ty, loc> config;
 
@@ -197,8 +197,8 @@ namespace rapid
 				rmsprop() = default;
 
 				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &x,
-											  const ndarray::Array<_Ty, loc> &dx,
-											  Config<_Ty, loc> &config) override
+												   const ndarray::Array<_Ty, loc> &dx,
+												   Config<_Ty, loc> &config) override
 				{
 					if (config.initialized == 0)
 					{
@@ -218,7 +218,7 @@ namespace rapid
 				}
 
 				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &x,
-											  const ndarray::Array<_Ty, loc> &dx) override
+												   const ndarray::Array<_Ty, loc> &dx) override
 				{
 					Config<_Ty, loc> config;
 
@@ -233,7 +233,7 @@ namespace rapid
 			};
 
 			/// <summary>
-			// Uses the Adam update rule, which incorporates moving averages of
+			/// Uses the Adam update rule, which incorporates moving averages of
 			/// both the gradient and its square, and a bias correction term
 			/// </summary>
 			/// <typeparam name="_Ty"></typeparam>
@@ -244,8 +244,8 @@ namespace rapid
 				adam() = default;
 
 				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &x,
-											  const ndarray::Array<_Ty, loc> &dx,
-											  Config<_Ty, loc> &config) override
+												   const ndarray::Array<_Ty, loc> &dx,
+												   Config<_Ty, loc> &config) override
 				{
 					if (config.initialized == 0)
 					{
@@ -254,11 +254,11 @@ namespace rapid
 						config.beta1.defaultValue = 0.9;
 						config.beta2.defaultValue = 0.999;
 						config.epsilon.defaultValue = 1e-8;
-						config.m.defaultValue.set(zerosLike(x));
-						config.v.defaultValue.set(zerosLike(x));
+						config.m.defaultValue.set(ndarray::zerosLike(x));
+						config.v.defaultValue.set(ndarray::zerosLike(x));
 						config.t = 0;
 					}
-
+					 
 					auto m = config.m.getValue();
 					auto v = config.v.getValue();
 					auto t = config.t;
@@ -268,7 +268,7 @@ namespace rapid
 					auto mCorr = m / (1. - std::pow(config.beta1.getValue(), (_Ty) t));
 					v.set(config.beta2.getValue() * v + (1 - config.beta2.getValue()) * (dx * dx));
 					auto vCorr = v / (1 - std::pow(config.beta2.getValue(), (_Ty) t));
-					auto nextX = x - config.learningRate.getValue() * mCorr / (sqrt(vCorr) + config.epsilon.getValue());
+					auto nextX = x - config.learningRate.getValue() * mCorr / (ndarray::sqrt(vCorr) + config.epsilon.getValue());
 					config.m.setValue(m);
 					config.v.setValue(v);
 					config.t = t;
@@ -277,7 +277,7 @@ namespace rapid
 				}
 
 				inline OptimOutput<_Ty, loc> apply(ndarray::Array<_Ty, loc> &x,
-											  const ndarray::Array<_Ty, loc> &dx) override
+												   const ndarray::Array<_Ty, loc> &dx) override
 				{
 					Config<_Ty, loc> config;
 
@@ -286,8 +286,8 @@ namespace rapid
 					config.beta1.defaultValue = 0.9;
 					config.beta2.defaultValue = 0.999;
 					config.epsilon.defaultValue = 1e-8;
-					config.m.defaultValue.set(zerosLike(x));
-					config.v.defaultValue.set(zerosLike(x));
+					config.m.defaultValue.set(ndarray::zerosLike(x));
+					config.v.defaultValue.set(ndarray::zerosLike(x));
 					config.t = 0;
 
 					return apply(x, dx, config);

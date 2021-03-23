@@ -90,6 +90,8 @@
       <TargetMachinePlatform>64</TargetMachinePlatform>
       <Include>$(SolutionDir)Rapid\include;%(Include)</Include>
       <AdditionalCompilerOptions>/openmp</AdditionalCompilerOptions>
+      <FastMath>false</FastMath>
+      <Optimization>O3</Optimization>
     </CudaCompile>
   </ItemDefinitionGroup>
   <ItemGroup>

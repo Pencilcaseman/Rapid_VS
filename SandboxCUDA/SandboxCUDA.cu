@@ -13,104 +13,55 @@ int main()
 	using rapid::ndarray::CPU;
 	using rapid::ndarray::GPU;
 
-	// auto arr = rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
-	// 
-	// std::cout << arr << "\n\n";
-	// std::cout << arr + arr << "\n\n";
-	// std::cout << arr - arr << "\n\n";
-	// std::cout << arr * arr << "\n\n";
-	// std::cout << arr / arr << "\n\n";
-	// 
-	// std::cout << "\n\n";
-	// 
-	// std::cout << arr + 10 << "\n\n";
-	// std::cout << arr - 10 << "\n\n";
-	// std::cout << arr * 10 << "\n\n";
-	// std::cout << arr / 10 << "\n\n";
-	// 
-	// std::cout << "\n\n";
-	// 
-	// std::cout << arr << "\n\n";
-	// arr += rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
-	// std::cout << arr << "\n\n";
-	// arr -= rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
-	// std::cout << arr << "\n\n";
-	// arr *= rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
-	// std::cout << arr << "\n\n";
-	// arr /= rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
-	// std::cout << arr << "\n\n";
-	// 
-	// std::cout << "\n\n";
-	// 
-	// std::cout << arr << "\n\n";
-	// arr += 10;
-	// std::cout << arr << "\n\n";
-	// arr -= 10;
-	// std::cout << arr << "\n\n";
-	// arr *= 10;
-	// std::cout << arr << "\n\n";
-	// arr /= 10;
-	// std::cout << arr << "\n\n";
-	// 
-	// std::cout << "\n\n\n\n";
+	// ADAM
+	// > CPU ==> Block finished in: 23.239650 ms
+	// > GPU ==> Block finished in: 9.897372 ms
 
-	auto lhs = rapid::ndarray::Array<float, GPU>::fromData({{1, 2, 3}, {4, 5, 6}, {7, 8, 9}});
-	auto rhs = rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}, {5, 6}});
+	// > CPU ==> Block finished in: 136.322890 ms
+	// > GPU ==> Block finished in: 38.881290 ms
 
-	std::cout << lhs << "\n\n";
-	std::cout << rhs << "\n\n";
-	std::cout << lhs.dot(rhs) << "\n\n";
+	// SGD
+	// > CPU ==> Block finished in: 10.753736 ms
+	// > GPU ==> Block finished in: 3.629665 ms
 
-	rhs[1][1] = 12345;
-	rhs[0] = rapid::ndarray::Array<float, GPU>::fromData({123, 456});
+	using networkType = float;
+	const rapid::ndarray::ArrayLocation networkLocation = GPU;
 
-	std::cout << rhs << "\n\n";
-	std::cout << "Test: " << rhs[1][0] << "\n";
-
-	/*
+	// auto w = rapid::ndarray::Array<networkType, networkLocation>({5, 5});
+	// auto dw = rapid::ndarray::onesLike(w);
+	// w.fill(0.5);
+	// auto optimizer = std::make_shared<rapid::network::optim::adam<networkType, networkLocation>>();
+	// 
+	// auto res = optimizer->apply(w, dw);
+	// w.set(res.weight);
+	// rapid::network::optim::Config<networkType, networkLocation> config = res.config;
+	// 
+	// std::cout << w.toString() << "\n\n";
+	// for (int i = 0; i < 5; i++)
+	// {
+	// 	res = optimizer->apply(w, dw, config);
+	// 	w.set(res.weight);
+	// 	config = res.config;
+	// 	std::cout << w.toString() << "\n\n";
+	// }
+	
 	{
-		std::cout << "Timing GPU<float>\n";
-		auto speedTestGPU = rapid::ndarray::Array<float, GPU>({1000, 1000});
-
-		START_TIMER(0, 10000);
-		auto res = speedTestGPU.dot(speedTestGPU);
+		auto w = rapid::ndarray::Array<networkType, networkLocation>({3000, 3000});
+		auto dw = rapid::ndarray::onesLike(w);
+		w.fill(0.5);
+		auto optimizer = std::make_shared<rapid::network::optim::sgd<networkType, networkLocation>>();
+	
+		auto res = optimizer->apply(w, dw);
+		w.set(res.weight);
+		auto config = res.config;
+	
+		std::cout << "Timing:\n";
+		START_TIMER(0, 5000);
+		res = optimizer->apply(w, dw, config);
+		w.set(res.weight);
+		config = res.config;
 		END_TIMER(0);
-
-		std::cout << "Timing CPU<float>\n";
-		auto speedTestCPU = rapid::ndarray::Array<float, CPU>({1000, 1000});
-
-		START_TIMER(1, 100);
-		auto res = speedTestCPU.dot(speedTestCPU);
-		END_TIMER(1);
 	}
-
-	{
-		std::cout << "Timing GPU<double>\n";
-		auto speedTestGPU = rapid::ndarray::Array<double, GPU>({1000, 1000});
-
-		START_TIMER(0, 1000);
-		auto res = speedTestGPU.dot(speedTestGPU);
-		END_TIMER(0);
-
-		std::cout << "Timing CPU<double>\n";
-		auto speedTestCPU = rapid::ndarray::Array<double, CPU>({1000, 1000});
-
-		START_TIMER(1, 100);
-		auto res = speedTestCPU.dot(speedTestCPU);
-		END_TIMER(1);
-	}
-	*/
-
-	std::cout << "\n\n\n\n\n";
-	auto a = rapid::ndarray::Array<float, GPU>({2, 2, 2});
-	a.fill(0);
-	auto b = rapid::ndarray::Array<float, GPU>::fromData({{1, 2}, {3, 4}});
-
-	std::cout << a << "\n\n";
-	std::cout << b << "\n\n";
-
-	a[0] = b;
-	std::cout << a << "\n\n";
 
 	return 0;
 }
