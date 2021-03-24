@@ -633,6 +633,27 @@ namespace rapid
 				return *this;
 			}
 
+		#ifdef RAPID_CUDA
+			inline Array<arrayType, location> toRowMajor() const
+			{
+				Array<arrayType, location> res(shape);
+
+				if (shape.size() == 2)
+				{
+					cuda::columnToRowOrdering(shape[0], shape[1], dataStart, res.dataStart);
+				}
+				else if (shape.size() > 2)
+				{
+					for (uint64_t i = 0; i < shape[0]; i++)
+					{
+						res[i] = (*this)[i].toRowMajor();
+					}
+				}
+
+				return res;
+			}
+		#endif
+
 			/// <summary>
 			/// Create an array from the provided data, without creating a
 			/// temporary one first. This fixes memory leaks and is intended
@@ -696,9 +717,9 @@ namespace rapid
 		#define imp_temp template<typename t>
 		#define imp_func_def(x) static inline Array<arrayType, location> fromData(const x &data)
 		#define imp_func_body	auto res = Array<arrayType, location>(imp::extractShape(data)); \
-							uint64_t index = 0; \
-							for (const auto &val : data) res[index++] = Array<arrayType, location>::fromData(val); \
-							return res;
+							    uint64_t index = 0; \
+							    for (const auto &val : data) res.pseudoBrackets(index++) = Array<arrayType, location>::fromData(val); \
+							    return res;
 		#define L std::initializer_list
 
 			// Up to 20-dimensional array setting from data
@@ -1862,7 +1883,13 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
 				{
-					if (shape.size() == 2)
+					if (shape.size() == 1)
+					{
+						auto res = Array<arrayType, location>(newDims);
+						cudaSafeCall(cudaMemcpy(res.dataStart, dataStart, sizeof(arrayType) * math::prod(newDims), cudaMemcpyDeviceToDevice));
+						return res;
+					}
+					else if (shape.size() == 2)
 					{
 						uint64_t m = shape[1];
 						uint64_t n = shape[0];
@@ -1881,6 +1908,75 @@ namespace rapid
 									   &beta,
 									   dataStart, n,
 									   res.dataStart, m));
+
+						return res;
+					}
+					else
+					{
+						auto hostThis = new arrayType[math::prod(shape)];
+						cudaSafeCall(cudaMemcpy(hostThis, dataStart, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToHost));
+
+						auto hostRes = new arrayType[math::prod(shape)];
+						cudaSafeCall(cudaMemcpy(hostRes, dataStart, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToHost));
+
+						std::vector<uint64_t> indices(shape.size(), 0);
+						std::vector<uint64_t> indicesRes(shape.size(), 0);
+
+						if (math::prod(shape) < 62000)
+						{
+							for (uint64_t i = 0; i < math::prod(shape); i++)
+							{
+								if (axes.empty())
+									for (uint64_t j = 0; j < shape.size(); j++)
+										indicesRes[j] = indices[shape.size() - j - 1];
+								else
+									for (uint64_t j = 0; j < shape.size(); j++)
+										indicesRes[j] = indices[axes[j]];
+
+								hostRes[imp::dimsToIndex(newDims, indicesRes)] = hostThis[imp::dimsToIndex(shape, indices)];
+
+								indices[shape.size() - 1]++;
+								uint64_t index = shape.size() - 1;
+
+								while (indices[index] >= shape[index] && index > 0)
+								{
+									indices[index] = 0;
+									index--;
+									indices[index]++;
+								}
+							}
+						}
+						else
+						{
+							auto tmpShape = shape;
+							for (int64_t i = 0; i < math::prod(tmpShape); i++)
+							{
+								if (axes.empty())
+									for (int64_t j = 0; j < tmpShape.size(); j++)
+										indicesRes[j] = indices[tmpShape.size() - j - 1];
+								else
+									for (int64_t j = 0; j < tmpShape.size(); j++)
+										indicesRes[j] = indices[axes[j]];
+
+								hostRes[imp::dimsToIndex(newDims, indicesRes)] = hostThis[imp::dimsToIndex(tmpShape, indices)];
+
+								indices[tmpShape.size() - 1]++;
+								int64_t index = tmpShape.size() - 1;
+
+								while (indices[index] >= tmpShape[index] && index > 0)
+								{
+									indices[index] = 0;
+									index--;
+									indices[index]++;
+								}
+							}
+						}
+
+						auto res = Array<arrayType, location>(newDims);
+						cudaSafeCall(cudaMemcpy(res.dataStart, hostRes, sizeof(arrayType) * math::prod(shape), cudaMemcpyHostToDevice));
+
+						delete[] hostThis;
+						delete[] hostRes;
 
 						return res;
 					}

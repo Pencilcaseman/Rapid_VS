@@ -48,11 +48,12 @@ namespace rapid
 			/// <param name="stripMiddle"></param>
 			/// <returns></returns>
 			std::string toString(const std::vector<std::string> &adjusted, const std::vector<size_t> &shape,
-								 size_t depth, bool stripMiddle)
+								 size_t depth, bool stripMiddle, bool wasGPU)
 			{
 				if (shape.size() == 1)
 					return toString1D(adjusted, stripMiddle);
-				else if (shape.size() == 2)
+
+				if (shape.size() == 2)
 				{
 					std::string res = "[";
 
@@ -108,7 +109,7 @@ namespace rapid
 						auto subAdjusted = std::vector<std::string>(adjustedStart, adjustedEnd);
 						auto subShape = std::vector<size_t>(shapeStart, shapeEnd);
 
-						res += toString(subAdjusted, subShape, depth + 1, stripMiddle);
+						res += toString(subAdjusted, subShape, depth + 1, stripMiddle, wasGPU);
 
 						if (count + 1 != shape[0])
 							res += "\n\n";
@@ -182,15 +183,12 @@ namespace rapid
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
-				t *resData;
-				cudaSafeCall(cudaMalloc(&resData, sizeof(t) * math::prod(shape)));
-
-				cuda::columnToRowOrdering(shape[0], shape[1], dataStart, resData);
-
 				cudaSafeCall(cudaDeviceSynchronize());
+				auto rowMajor = toRowMajor();
+				cudaSafeCall(cudaDeviceSynchronize());
+
 				arrayData = new t[math::prod(shape)];
-				cudaSafeCall(cudaMemcpy(arrayData, resData, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
-				cudaSafeCall(cudaFree(resData));
+				cudaSafeCall(cudaMemcpy(arrayData, rowMajor.dataStart, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
 			}
 		#endif
 
@@ -222,7 +220,7 @@ namespace rapid
 						longestDecimal = formatted[index].str.length() - formatted[index].decimalPoint;
 				}
 			}
-			
+
 		#ifdef RAPID_CUDA
 			if (loc == GPU)
 				delete[] arrayData;
@@ -240,11 +238,15 @@ namespace rapid
 
 				auto tmp = std::string(longestIntegral - term.decimalPoint, ' ') + term.str + std::string(longestDecimal - decimal, ' ');
 				adjusted[i] = tmp;
-			}
+				}
 
-			auto res = utils::toString(adjusted, shape, 1 + startDepth, stripMiddle);
+		#ifdef RAPID_CUDA
+			auto res = utils::toString(adjusted, shape, 1 + startDepth, stripMiddle, loc == GPU);
+		#else
+			auto res = utils::toString(adjusted, shape, 1 + startDepth, stripMiddle, false);
+		#endif
 
 			return res;
 		}
 	}
-}
+			}
