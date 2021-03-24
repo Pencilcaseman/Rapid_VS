@@ -8,14 +8,19 @@
 
 int main()
 {
-	auto w = rapid::ndarray::Array<double>({5, 5});
+	using rapid::ndarray::CPU;
+
+	using networkType = float;
+	const rapid::ndarray::ArrayLocation networkLocation = CPU;
+
+	auto w = rapid::ndarray::Array<networkType, networkLocation>({5, 5});
 	auto dw = rapid::ndarray::onesLike(w);
 	w.fill(0.5);
-	auto optimizer = std::make_shared<rapid::network::optim::adam<double>>();
+	auto optimizer = std::make_shared<rapid::network::optim::adam<networkType, networkLocation>>();
 
 	auto res = optimizer->apply(w, dw);
 	w.set(res.weight);
-	rapid::network::optim::Config<double> config = res.config;
+	rapid::network::optim::Config<networkType, networkLocation> config = res.config;
 
 	std::cout << w.toString() << "\n\n";
 	for (int i = 0; i < 5; i++)
@@ -27,27 +32,22 @@ int main()
 	}
 
 	{
-		auto w = rapid::ndarray::Array<double>({1000, 1000});
+		auto w = rapid::ndarray::Array<networkType, networkLocation>({3000, 3000});
 		auto dw = rapid::ndarray::onesLike(w);
 		w.fill(0.5);
-		auto optimizer = std::make_shared<rapid::network::optim::adam<double>>();
+		auto optimizer = std::make_shared<rapid::network::optim::adam<networkType, networkLocation>>();
 
 		auto res = optimizer->apply(w, dw);
 		w.set(res.weight);
-		rapid::network::optim::Config<double> config = res.config;
+		auto config = res.config;
 
-		START_TIMER(0, 10);
+		std::cout << "Timing:\n";
+		START_TIMER(0, 100);
 		res = optimizer->apply(w, dw, config);
 		w.set(res.weight);
 		config = res.config;
 		END_TIMER(0);
 	}
-
-	auto chonkey = rapid::ndarray::Array<float>({5000, 5000});
-
-	START_TIMER(1, 1);
-	auto res = chonkey.dot(chonkey);
-	END_TIMER(1);
 
 	return 0;
 }

@@ -843,7 +843,7 @@ namespace rapid
 					rapidAssert(isZeroDim, "Cannot cast multidimensional array to scalar value");
 				if (location == CPU)
 					return (t) (dataStart[0]);
-			
+
 			#ifdef RAPID_CUDA
 				if (location == GPU)
 				{
@@ -1690,49 +1690,6 @@ namespace rapid
 								arrayType dotAlpha = 1;
 								arrayType dotBeta = 0;
 
-								// arrayType *tempThis;
-								// cudaSafeCall(cudaMalloc(&tempThis, sizeof(arrayType) * math::prod(shape)));
-								// cublasSafeCall(cublasSgeam(handle::handle,
-								// 			   CUBLAS_OP_T, CUBLAS_OP_T,
-								// 			   m, n,
-								// 			   &dotAlpha,
-								// 			   dataStart, n,
-								// 			   &dotBeta,
-								// 			   dataStart, n,
-								// 			   tempThis, m));
-								// 
-								// arrayType *tempOther;
-								// cudaSafeCall(cudaMalloc(&tempOther, sizeof(arrayType) * math::prod(other.shape)));
-								// cublasSafeCall(cublasSgeam(handle::handle,
-								// 			   CUBLAS_OP_T, CUBLAS_OP_T,
-								// 			   n, k,
-								// 			   &dotAlpha,
-								// 			   other.dataStart, k,
-								// 			   &dotBeta,
-								// 			   other.dataStart, k,
-								// 			   tempOther, n));
-								// 
-								// arrayType *tempRes;
-								// cudaSafeCall(cudaMalloc(&tempRes, sizeof(arrayType) * math::prod(res.shape)));
-								// 
-								// cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, tempThis, m, tempOther, n, &dotBeta, tempRes, m);
-								// 
-								// cudaSafeCall(cudaFree(tempThis));
-								// cudaSafeCall(cudaFree(tempOther));
-								// 
-								// cudaSafeCall(cudaDeviceSynchronize());
-								// 
-								// cublasSafeCall(cublasSgeam(handle::handle,
-								// 			   CUBLAS_OP_T, CUBLAS_OP_T,
-								// 			   k, m,
-								// 			   &dotAlpha,
-								// 			   tempRes, m,
-								// 			   &dotBeta,
-								// 			   tempRes, m,
-								// 			   res.dataStart, k));
-								// 
-								// cudaSafeCall(cudaFree(tempRes));
-
 								cudaSafeCall(cudaDeviceSynchronize());
 								cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, dataStart, m, other.dataStart, n, &dotBeta, res.dataStart, m);
 
@@ -1746,9 +1703,7 @@ namespace rapid
 								Array<arrayType, location> res(resShape);
 
 								for (uint64_t i = 0; i < shape[0]; i++)
-								{
 									res[i] = (operator[](i).dot(other[i]));
-								}
 
 								return res;
 							}
@@ -1815,9 +1770,7 @@ namespace rapid
 							for (uint64_t i = 0; i < rows; i++)
 							{
 								for (uint64_t j = 0; j < cols; j++)
-								{
 									res.dataStart[i + j * rows] = dataStart[j + i * cols];
-								}
 							}
 						}
 						else
@@ -1911,18 +1864,15 @@ namespace rapid
 				{
 					if (shape.size() == 2)
 					{
-						uint64_t m = shape[0];
-						uint64_t n = shape[1];
+						uint64_t m = shape[1];
+						uint64_t n = shape[0];
 
 						auto res = Array<arrayType, location>(newDims);
 
 						arrayType alpha = 1;
 						arrayType beta = 0;
 
-						arrayType *tempRes;
-
 						cudaSafeCall(cudaDeviceSynchronize());
-						cudaSafeCall(cudaMalloc(&tempRes, sizeof(arrayType) * math::prod(shape)));
 						cublasSafeCall(cublasSgeam(handle::handle,
 									   CUBLAS_OP_T, CUBLAS_OP_T,
 									   m, n,
@@ -1930,10 +1880,7 @@ namespace rapid
 									   dataStart, n,
 									   &beta,
 									   dataStart, n,
-									   tempRes, m));
-
-						cudaSafeCall(cudaDeviceSynchronize());
-						cudaSafeCall(cudaMemcpy(res.dataStart, tempRes, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToDevice));
+									   res.dataStart, m));
 
 						return res;
 					}
@@ -2312,7 +2259,7 @@ namespace rapid
 
 				for (size_t i = 0; i < math::prod(arr.shape); i++)
 					res += host[i];
-				
+
 				delete[] host;
 				return res;
 			}
@@ -2401,7 +2348,8 @@ namespace rapid
 		{
 			Array<t, loc> result(arr.shape);
 
-			if (loc == CPU) {
+			if (loc == CPU)
+			{
 				ExecutionType mode;
 				if (math::prod(arr.shape) > 10000)
 					mode = ExecutionType::PARALLEL;
@@ -2435,7 +2383,8 @@ namespace rapid
 		{
 			Array<t, loc> result(arr.shape);
 
-			if (loc == CPU) {
+			if (loc == CPU)
+			{
 				ExecutionType mode;
 				if (math::prod(arr.shape) > 10000)
 					mode = ExecutionType::PARALLEL;
@@ -2704,5 +2653,5 @@ namespace rapid
 
 			return res;
 		}
-		}
-		}
+	}
+}
