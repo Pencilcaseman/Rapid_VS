@@ -816,6 +816,23 @@ namespace rapid
 
 				return res;
 			}
+
+			inline void toColumMajor_inplace()
+			{
+				cudaSafeCall(cudaDeviceSynchronize());
+
+				if (shape.size() == 2)
+				{
+					cuda::rowToColumnOrdering(shape[0], shape[1], dataStart, dataStart);
+				}
+				else if (shape.size() > 2)
+				{
+					for (uint64_t i = 0; i < shape[0]; i++)
+					{
+						(*this)[i].toColumMajor_inplace();
+					}
+				}
+			}
 		#endif
 
 			/// <summary>
@@ -3389,9 +3406,10 @@ namespace rapid
 		#define AUTO ((uint64_t) -1)
 
 			/// <summary>
-			/// Resize an array and return the result. The resulting data
-			/// is linked to the parent data, so updating values will
-			/// trigger an update in the parent/child array
+			/// Resize an array and return the result. The resulting
+			/// array is not linked in any way to the parent array,
+			/// so an update in the result will not change a value
+			/// in the original array.
 			/// </summary>
 			/// <param name="newShape"></param>
 			/// <returns></returns>
@@ -3428,13 +3446,29 @@ namespace rapid
 				else
 					zeroDim = false;
 
-				(*originCount)++;
-				auto res = Array<arrayType, location>::fromData(tmpNewShape, dataOrigin, dataStart, originCount, zeroDim);
+				arrayType *newDataStart;
+				auto newOriginCount = new uint64_t(1);
+
+				if (location == CPU)
+				{
+					newDataStart = new arrayType[math::prod(shape)];
+					memcpy(newDataStart, dataStart, sizeof(arrayType) * math::prod(shape));
+				}
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					cudaSafeCall(cudaMalloc(&newDataStart, sizeof(arrayType) * math::prod(shape)));
+					cudaSafeCall(cudaDeviceSynchronize());
+					cudaSafeCall(cudaMemcpy(newDataStart, dataStart, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToDevice));
+				}
+			#endif
+
+				auto res = Array<arrayType, location>::fromData(tmpNewShape, newDataStart, newDataStart, newOriginCount, zeroDim);
 
 			#ifdef RAPID_CUDA
-				// Check if result is a matrix, in which case, convert it to column-major ordering
-				if (newShape.size() == 2)
-					cuda::rowToColumnOrdering(newShape[0], newShape[1], res.dataStart, res.dataStart);
+				// If using CUDA, convert to column major
+				if (location == GPU)
+					res.toColumMajor_inplace();
 			#endif
 
 				return res;
