@@ -223,12 +223,12 @@ namespace rapid
 		/// <param name="arr"></param>
 		/// <returns></returns>
 		template<typename t>
-		t prod(const std::vector<t> arr)
+		t prod(const std::vector<t> &arr)
 		{
-			size_t prod = 1;
+			size_t res = 1;
 			for (const auto &val : arr)
-				prod *= val;
-			return prod;
+				res *= val;
+			return res;
 		}
 	}
 }

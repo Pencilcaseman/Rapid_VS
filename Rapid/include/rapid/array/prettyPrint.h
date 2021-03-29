@@ -184,11 +184,22 @@ namespace rapid
 			else if (loc == GPU)
 			{
 				cudaSafeCall(cudaDeviceSynchronize());
-				auto rowMajor = toRowMajor();
-				cudaSafeCall(cudaDeviceSynchronize());
 
-				arrayData = new t[math::prod(shape)];
-				cudaSafeCall(cudaMemcpy(arrayData, rowMajor.dataStart, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
+				if (useMatrixData)
+				{
+					arrayData = new t[math::prod(shape)];
+
+					for (uint64_t i = 0; i < shape[0]; i++)
+						cudaSafeCall(cudaMemcpy(arrayData + i, dataStart + matrixAccess + i * matrixRows, sizeof(t), cudaMemcpyDeviceToHost));
+				}
+				else
+				{
+					auto rowMajor = toRowMajor();
+					cudaSafeCall(cudaDeviceSynchronize());
+
+					arrayData = new t[math::prod(shape)];
+					cudaSafeCall(cudaMemcpy(arrayData, rowMajor.dataStart, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
+				}
 			}
 		#endif
 
@@ -238,7 +249,7 @@ namespace rapid
 
 				auto tmp = std::string(longestIntegral - term.decimalPoint, ' ') + term.str + std::string(longestDecimal - decimal, ' ');
 				adjusted[i] = tmp;
-				}
+			}
 
 		#ifdef RAPID_CUDA
 			auto res = utils::toString(adjusted, shape, 1 + startDepth, stripMiddle, loc == GPU);
@@ -249,4 +260,4 @@ namespace rapid
 			return res;
 		}
 	}
-			}
+}

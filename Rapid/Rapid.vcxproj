@@ -183,6 +183,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="include\rapid\array.h" />
+    <ClInclude Include="include\rapid\array\arrayCore.h" />
     <ClInclude Include="include\rapid\array\cblasAPI.h" />
     <ClInclude Include="include\rapid\array\cudaAPI.cuh" />
     <ClInclude Include="include\rapid\array\fromData.h" />
@@ -268,7 +269,6 @@
     <ClInclude Include="include\rapid\matrix\matrixCore.h" />
     <ClInclude Include="include\rapid\matrix\tinyMatrix.h" />
     <ClInclude Include="include\rapid\messageBox.h" />
-    <ClInclude Include="include\rapid\array\arrayCore.h" />
     <ClInclude Include="include\rapid\network.h" />
     <ClInclude Include="include\rapid\network\activations.h" />
     <ClInclude Include="include\rapid\network\networkCore.h" />

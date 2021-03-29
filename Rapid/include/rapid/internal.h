@@ -40,7 +40,7 @@
 #endif
 
 #ifndef RAPID_CUDA
-#ifdef CUDA_VERSION 
+#ifdef CUDA_VERSION
 #define RAPID_CUDA
 #else
 #define RAPID_CPP
@@ -208,7 +208,7 @@ inline void HIDDEN_cudaSafeCall(cudaError_t err, const char *file, const int lin
 #endif
 #elif defined(__hpux)
 #define RAPID_OS_HP_UX// HP-UX
-#define RAPID_OS "hp-ux" 
+#define RAPID_OS "hp-ux"
 #elif defined(_AIX)
 #define RAPID_OS_AIX // IBM AIX
 #define RAPID_OS "aix"
@@ -228,7 +228,7 @@ inline void HIDDEN_cudaSafeCall(cudaError_t err, const char *file, const int lin
 #define RAPID_OS_SOLARIS // Oracle Solaris, Open Indiana
 #define RAPID_OS "solaris"
 #else
-#define RAPID_OS_UNKNOWN 
+#define RAPID_OS_UNKNOWN
 #define RAPID_OS "unknown"
 #endif
 
@@ -239,7 +239,7 @@ std::string workingDirectory()
 {
 	char buff[255];
 	char *res = _getcwd(buff, 255);
-	
+
 #ifdef RAPID_DEBUG
 	if (res == nullptr)
 		throw std::runtime_error("Unable to fetch working directory");
