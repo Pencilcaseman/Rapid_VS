@@ -50,5 +50,27 @@ int main()
 	std::cout << arr << "\n\n";
 	std::cout << d3 << "\n\n";
 
+	auto dotTest = rapid::ndarray::Array<float, GPU>({1000, 1000});
+	START_TIMER(0, 1000);
+	auto dotRes = dotTest.dot(dotTest);
+	END_TIMER(0);
+
+	auto dotTest2 = rapid::ndarray::Array<float, CPU>({1000, 1000});
+	START_TIMER(1, 100);
+	auto dotRes = dotTest2.dot(dotTest2);
+	END_TIMER(1);
+
+	auto dotTest3 = rapid::ndarray::Array<double, GPU>({1000, 1000});
+	START_TIMER(2, 1000);
+	auto dotRes = dotTest3.dot(dotTest3);
+	END_TIMER(2);
+
+	auto dotTest4 = rapid::ndarray::Array<double, CPU>({1000, 1000});
+	START_TIMER(3, 100);
+	auto dotRes = dotTest4.dot(dotTest4);
+	END_TIMER(3);
+
+	std::cout << rapid::ndarray::Array<float, GPU>::fromData({1, 2, 3, 4, 5, 6}).reshaped({2, 3}).dot(rapid::ndarray::Array<float, GPU>::fromData({1, 2, 3}).reshaped({3, 1})) << "\n\n";
+
 	return 0;
 }

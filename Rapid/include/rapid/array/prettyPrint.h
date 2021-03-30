@@ -185,21 +185,21 @@ namespace rapid
 			{
 				cudaSafeCall(cudaDeviceSynchronize());
 
-				if (useMatrixData)
-				{
-					arrayData = new t[math::prod(shape)];
+				// if (useMatrixData)
+				// {
+				// 	arrayData = new t[math::prod(shape)];
+				// 
+				// 	for (uint64_t i = 0; i < shape[0]; i++)
+				// 		cudaSafeCall(cudaMemcpy(arrayData + i, dataStart + matrixAccess + i * matrixRows, sizeof(t), cudaMemcpyDeviceToHost));
+				// }
+				// else
+				// {
+					// auto rowMajor = toRowMajor();
+					// cudaSafeCall(cudaDeviceSynchronize());
 
-					for (uint64_t i = 0; i < shape[0]; i++)
-						cudaSafeCall(cudaMemcpy(arrayData + i, dataStart + matrixAccess + i * matrixRows, sizeof(t), cudaMemcpyDeviceToHost));
-				}
-				else
-				{
-					auto rowMajor = toRowMajor();
-					cudaSafeCall(cudaDeviceSynchronize());
-
 					arrayData = new t[math::prod(shape)];
-					cudaSafeCall(cudaMemcpy(arrayData, rowMajor.dataStart, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
-				}
+					cudaSafeCall(cudaMemcpy(arrayData, dataStart, sizeof(t) * math::prod(shape), cudaMemcpyDeviceToHost));
+				// }
 			}
 		#endif
 

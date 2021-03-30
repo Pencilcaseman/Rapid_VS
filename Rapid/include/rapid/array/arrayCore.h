@@ -207,24 +207,24 @@ namespace rapid
 			size_t *originCount;
 			bool isZeroDim;
 
-		#ifdef RAPID_CUDA
-			bool useMatrixData = false;
-			uint64_t matrixRows = 0;
-			uint64_t matrixAccess = 0;
-		#endif
+			// #ifdef RAPID_CUDA
+			// 	bool useMatrixData = false;
+			// 	uint64_t matrixRows = 0;
+			// 	uint64_t matrixAccess = 0;
+			// #endif
 
-			/// <summary>
-			/// Apply a lambda function to two arrays, storing the result in a third.
-			/// Both arrays must be the same size, but this in not checked when running,
-			/// so it is therefore the responsibility of the user to ensure this function
-			/// is called safely
-			/// </summary>
-			/// <typeparam name="Lambda"></typeparam>
-			/// <param name="a"></param>
-			/// <param name="b"></param>
-			/// <param name="c"></param>
-			/// <param name="mode"></param>
-			/// <param name="func"></param>
+				/// <summary>
+				/// Apply a lambda function to two arrays, storing the result in a third.
+				/// Both arrays must be the same size, but this in not checked when running,
+				/// so it is therefore the responsibility of the user to ensure this function
+				/// is called safely
+				/// </summary>
+				/// <typeparam name="Lambda"></typeparam>
+				/// <param name="a"></param>
+				/// <param name="b"></param>
+				/// <param name="c"></param>
+				/// <param name="mode"></param>
+				/// <param name="func"></param>
 			template<typename Lambda, ArrayLocation loc>
 			inline static void binaryOpArrayArray(const Array<arrayType, loc> &a, const Array<arrayType, loc> &b,
 												  Array<arrayType, loc> &c, ExecutionType mode, Lambda func)
@@ -645,11 +645,11 @@ namespace rapid
 				dataStart = other.dataStart;
 				dataOrigin = other.dataOrigin;
 
-			#ifdef RAPID_CUDA
-				useMatrixData = other.useMatrixData;
-				matrixRows = other.matrixRows;
-				matrixAccess = other.matrixAccess;
-			#endif
+				// #ifdef RAPID_CUDA
+				// 	useMatrixData = other.useMatrixData;
+				// 	matrixRows = other.matrixRows;
+				// 	matrixAccess = other.matrixAccess;
+				// #endif
 
 				originCount = other.originCount;
 				(*originCount)++;
@@ -708,11 +708,11 @@ namespace rapid
 					*originCount = 1;
 				}
 
-			#ifdef RAPID_CUDA
-				useMatrixData = false;
-				matrixRows = 0;
-				matrixAccess = 0;
-			#endif
+				// #ifdef RAPID_CUDA
+				// 	useMatrixData = false;
+				// 	matrixRows = 0;
+				// 	matrixAccess = 0;
+				// #endif
 			}
 
 			/// <summary>
@@ -730,11 +730,11 @@ namespace rapid
 				originCount = other.originCount;
 				(*originCount)++;
 
-			#ifdef RAPID_CUDA
-				useMatrixData = other.useMatrixData;
-				matrixRows = other.matrixRows;
-				matrixAccess = other.matrixAccess;
-			#endif
+				// #ifdef RAPID_CUDA
+				// 	useMatrixData = other.useMatrixData;
+				// 	matrixRows = other.matrixRows;
+				// 	matrixAccess = other.matrixAccess;
+				// #endif
 			}
 
 			/// <summary>
@@ -752,29 +752,31 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
 				{
-					cudaSafeCall(cudaDeviceSynchronize());
-					if (useMatrixData || other.useMatrixData)
-					{
-						for (uint64_t i = 0; i < other.shape[0]; i++)
-						{
-							uint64_t offThis = useMatrixData ? matrixAccess + i * matrixRows : i;
-							uint64_t offOther = other.useMatrixData ? other.matrixAccess + i * other.matrixRows : i;
+					// cudaSafeCall(cudaDeviceSynchronize());
+					// if (useMatrixData || other.useMatrixData)
+					// {
+					// 	for (uint64_t i = 0; i < other.shape[0]; i++)
+					// 	{
+					// 		uint64_t offThis = useMatrixData ? matrixAccess + i * matrixRows : i;
+					// 		uint64_t offOther = other.useMatrixData ? other.matrixAccess + i * other.matrixRows : i;
+					// 
+					// 		cudaSafeCall(cudaMemcpy(dataStart + offThis, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToDevice));
+					// 	}
+					// }
+					// else
+					// {
+					// 	cudaSafeCall(cudaMemcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType), cudaMemcpyDeviceToDevice));
+					// }
 
-							cudaSafeCall(cudaMemcpy(dataStart + offThis, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToDevice));
-						}
-					}
-					else
-					{
-						cudaSafeCall(cudaMemcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType), cudaMemcpyDeviceToDevice));
-					}
+					cudaSafeCall(cudaMemcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType), cudaMemcpyDeviceToDevice));
 				}
 			#endif
 
-			#ifdef RAPID_CUDA
-				useMatrixData = other.useMatrixData;
-				matrixRows = other.matrixRows;
-				matrixAccess = other.matrixAccess;
-			#endif
+				// #ifdef RAPID_CUDA
+				// 	useMatrixData = other.useMatrixData;
+				// 	matrixRows = other.matrixRows;
+				// 	matrixAccess = other.matrixAccess;
+				// #endif
 
 				return *this;
 			}
@@ -815,6 +817,23 @@ namespace rapid
 				}
 
 				return res;
+			}
+
+			inline void toRowMajor_inplace()
+			{
+				cudaSafeCall(cudaDeviceSynchronize());
+
+				if (shape.size() == 2)
+				{
+					cuda::columnToRowOrdering((unsigned int) shape[0], (unsigned int) shape[1], dataStart, dataStart);
+				}
+				else if (shape.size() > 2)
+				{
+					for (uint64_t i = 0; i < shape[0]; i++)
+					{
+						(*this)[i].toRowMajor_inplace();
+					}
+				}
 			}
 
 			inline void toColumMajor_inplace()
@@ -899,8 +918,10 @@ namespace rapid
 		#define imp_func_def(x) static inline Array<arrayType, location> fromData(const x &data)
 		#define imp_func_body	auto res = Array<arrayType, location>(imp::extractShape(data)); \
 							    uint64_t index = 0; \
-							    for (const auto &val : data) res.pseudoBrackets(index++) = Array<arrayType, location>::fromData(val); \
-							    return res;
+								for (const auto &val : data) res[index++] = Array<arrayType, location>::fromData(val); \
+									return res;
+			// for (const auto &val : data) res.pseudoBrackets(index++) = Array<arrayType, location>::fromData(val); backslash
+
 		#define L std::initializer_list
 
 			// Up to 20-dimensional array setting from data
@@ -908,29 +929,29 @@ namespace rapid
 			{
 				auto res = Array<arrayType, location>(imp::extractShape(data));
 
-				if (location == CPU)
-				{
-					uint64_t index = 0;
-					for (const auto &val : data)
-						res[index++] = Array<arrayType, location>::fromData(val);
-				}
-			#ifdef RAPID_CUDA
-				else if (location == GPU)
-				{
-					uint64_t index = 0;
-					for (const auto &val : data)
-						res.pseudoBrackets(index++) = Array<arrayType, location>::fromData(val);
-
-					arrayType *resData;
-					cudaSafeCall(cudaMalloc(&resData, sizeof(arrayType) * math::prod(res.shape)));
-
-					cudaSafeCall(cudaDeviceSynchronize());
-					cuda::rowToColumnOrdering((unsigned int) res.shape[0], (unsigned int) res.shape[1], res.dataStart, resData);
-					cudaSafeCall(cudaDeviceSynchronize());
-					cudaSafeCall(cudaMemcpy(res.dataStart, resData, sizeof(arrayType) * math::prod(res.shape), cudaMemcpyDeviceToDevice));
-					cudaSafeCall(cudaFree(resData));
-				}
-			#endif
+				// if (location == CPU)
+				// {
+				uint64_t index = 0;
+				for (const auto &val : data)
+					res[index++] = Array<arrayType, location>::fromData(val);
+				// }
+			// #ifdef RAPID_CUDA
+			// 	else if (location == GPU)
+			// 	{
+			// 		uint64_t index = 0;
+			// 		for (const auto &val : data)
+			// 			res.pseudoBrackets(index++) = Array<arrayType, location>::fromData(val);
+			// 
+			// 		arrayType *resData;
+			// 		cudaSafeCall(cudaMalloc(&resData, sizeof(arrayType) * math::prod(res.shape)));
+			// 
+			// 		cudaSafeCall(cudaDeviceSynchronize());
+			// 		cuda::rowToColumnOrdering((unsigned int) res.shape[0], (unsigned int) res.shape[1], res.dataStart, resData);
+			// 		cudaSafeCall(cudaDeviceSynchronize());
+			// 		cudaSafeCall(cudaMemcpy(res.dataStart, resData, sizeof(arrayType) * math::prod(res.shape), cudaMemcpyDeviceToDevice));
+			// 		cudaSafeCall(cudaFree(resData));
+			// 	}
+			// #endif
 
 				return res;
 			}
@@ -1051,42 +1072,40 @@ namespace rapid
 				if (location == GPU)
 				{
 					cudaSafeCall(cudaDeviceSynchronize());
-					auto resPtr = new arrayType;
-					cudaSafeCall(cudaMemcpy(resPtr, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
-					auto res = (t) (*resPtr);
-					delete resPtr;
+					arrayType res;
+					cudaSafeCall(cudaMemcpy(&res, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 					return res;
 				}
 			#endif
 			}
 
-			Array<arrayType, location> pseudoBrackets(const size_t &index) const
-			{
-				rapidAssert(index < shape[0], "Index out of range for array subscript");
-
-				(*originCount)++;
-
-				if (shape.size() == 1)
-				{
-					return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
-																originCount, true);
-				}
-
-				if (location == CPU)
-				{
-					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
-					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
-																originCount, isZeroDim);
-				}
-			#ifdef RAPID_CUDA
-				else if (location == GPU)
-				{
-					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
-					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
-																originCount, isZeroDim);
-				}
-			#endif
-			}
+			// Array<arrayType, location> pseudoBrackets(const size_t &index) const
+			// {
+			// 	rapidAssert(index < shape[0], "Index out of range for array subscript");
+			// 
+			// 	(*originCount)++;
+			// 
+			// 	if (shape.size() == 1)
+			// 	{
+			// 		return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+			// 													originCount, true);
+			// 	}
+			// 
+			// 	if (location == CPU)
+			// 	{
+			// 		std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+			// 		return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+			// 													originCount, isZeroDim);
+			// 	}
+			// #ifdef RAPID_CUDA
+			// 	else if (location == GPU)
+			// 	{
+			// 		std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+			// 		return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+			// 													originCount, isZeroDim);
+			// 	}
+			// #endif
+			// }
 
 			/// <summary>
 			/// Access a subarray or value of an array. The result is linked
@@ -1103,18 +1122,18 @@ namespace rapid
 
 				if (shape.size() == 1)
 				{
-				#ifdef RAPID_CUDA
-					if (useMatrixData)
-					{
-						return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + matrixAccess + index * matrixRows,
-																	originCount, true);
-					}
-					else
-					{
-						return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
-																	originCount, true);
-					}
-				#endif
+					// 				#ifdef RAPID_CUDA
+					// 					// if (useMatrixData)
+					// 					// {
+					// 					// 	return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + matrixAccess + index * matrixRows,
+					// 					// 												originCount, true);
+					// 					// }
+					// 					// else
+					// 					// {
+					// 						return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+					// 																	originCount, true);
+					// 					// }
+					// 				#endif
 
 					return Array<arrayType, location>::fromData({1}, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
 																originCount, true);
@@ -1127,19 +1146,25 @@ namespace rapid
 																originCount, isZeroDim);
 				}
 			#ifdef RAPID_CUDA
-				else if (shape.size() == 2 && location == GPU)
-				{
-					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
-					auto res = Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart, // + utils::ndToScalar({index}, shape), // dataStart,
-																	originCount, isZeroDim);
-
-					res.useMatrixData = true;
-					res.matrixRows = shape[0];
-					res.matrixAccess = index;
-
-					return res;
-				}
-				else
+				// 				else if (shape.size() == 2 && location == GPU)
+				// 				{
+				// 					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+				// 					auto res = Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart, // + utils::ndToScalar({index}, shape), // dataStart,
+				// 																	originCount, isZeroDim);
+				// 
+				// 					res.useMatrixData = true;
+				// 					res.matrixRows = shape[0];
+				// 					res.matrixAccess = index;
+				// 
+				// 					return res;
+				// 				}
+				// 				else
+				// 				{
+				// 					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
+				// 					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
+				// 																originCount, isZeroDim);
+				// 				}
+				else if (location == GPU)
 				{
 					std::vector<size_t> resShape(shape.begin() + 1, shape.end());
 					return Array<arrayType, location>::fromData(resShape, dataOrigin, dataStart + utils::ndToScalar({index}, shape),
@@ -1156,7 +1181,7 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <param name="index"></param>
 			/// <returns></returns>
-			template<typename t, ArrayLocation loc>
+			template<typename t>
 			inline arrayType accessVal(const std::initializer_list<t> &index) const
 			{
 				rapidAssert(index.size() == shape.size(), "Invalid number of dimensions to access");
@@ -1168,7 +1193,17 @@ namespace rapid
 				}
 			#endif
 
-				return dataStart[utils::ndToScalar(index, shape)];
+				if (location == CPU)
+					return dataStart[utils::ndToScalar(index, shape)];
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					arrayType res;
+					cudaSafeCall(cudaDeviceSynchronize());
+					cudaSafeCall(cudaMemcpy(&res, dataStart + utils::ndToScalar(index, shape), sizeof(arrayType), cudaMemcpyDeviceToHost));
+					return res;
+				}
+			#endif
 			}
 
 			/// <summary>
@@ -1194,20 +1229,39 @@ namespace rapid
 					dataStart[utils::ndToScalar(index, shape)] = val;
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
+				{
+					cudaSafeCall(cudaDeviceSynchronize());
 					cudaSafeCall(cudaMemcpy(dataStart + utils::ndToScalar(index, shape), &val, sizeof(arrayType), cudaMemcpyHostToDevice));
+				}
 			#endif
 			}
 
 			inline Array<arrayType, location> operator-() const
 			{
 				auto res = Array<arrayType, location>(shape);
-				Array<arrayType, location>::unaryOpArray(*this, res,
-														 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
-														 [](arrayType x)
+
+				if (location == CPU)
 				{
-					return -x;
-				});
-				return res;
+					auto res = Array<arrayType, location>(shape);
+
+					Array<arrayType, location>::unaryOpArray(*this, res,
+															 math::prod(shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
+															 [](arrayType x)
+					{
+						return -x;
+					});
+
+					return res;
+				}
+
+			#ifdef RAPID_CUDA
+				else if (location == GPU)
+				{
+					auto res = Array<arrayType, location>(shape);
+					cuda::sub_scalar_array((unsigned int) math::prod(shape), 0, 1, dataStart, 1, res.dataStart, 1);
+					return res;
+				}
+			#endif
 			}
 
 			/// <summary>
@@ -1263,13 +1317,13 @@ namespace rapid
 							{
 								auto res = Array<arrayType, location>(shape);
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t N = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t N = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
-								cuda::add_array_array((unsigned int) math::prod(shape), dataStart + offThis, (unsigned int) M, other.dataStart + offOther, (unsigned int) N, res.dataStart, 1);
+								cuda::add_array_array((unsigned int) math::prod(shape), dataStart, 1, other.dataStart, 1, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1299,14 +1353,14 @@ namespace rapid
 								auto res = Array<arrayType, location>(shape);
 								arrayType val;
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
-								cuda::add_array_scalar((unsigned int) math::prod(shape), dataStart + offThis, (unsigned int) M, val, res.dataStart, 1);
+								cuda::add_array_scalar((unsigned int) math::prod(shape), dataStart, 1, val, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1336,14 +1390,14 @@ namespace rapid
 								auto res = Array<arrayType, location>(other.shape);
 								arrayType val;
 
-								uint64_t M = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, dataStart + offThis, sizeof(arrayType), cudaMemcpyDeviceToHost));
-								cuda::add_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart + offOther, (unsigned int) M, res.dataStart, 1);
+								cudaSafeCall(cudaMemcpy(&val, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cuda::add_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1490,13 +1544,13 @@ namespace rapid
 							{
 								auto res = Array<arrayType, location>(shape);
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t N = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t N = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
-								cuda::sub_array_array((unsigned int) math::prod(shape), dataStart + offThis, (unsigned int) M, other.dataStart + offOther, (unsigned int) N, res.dataStart, 1);
+								cuda::sub_array_array((unsigned int) math::prod(shape), dataStart, 1, other.dataStart, 1, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1526,14 +1580,14 @@ namespace rapid
 								auto res = Array<arrayType, location>(shape);
 								arrayType val;
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
-								cuda::sub_array_scalar((unsigned int) math::prod(shape), dataStart + offThis, (unsigned int) M, val, res.dataStart, 1);
+								cuda::sub_array_scalar((unsigned int) math::prod(shape), dataStart, 1, val, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1563,14 +1617,14 @@ namespace rapid
 								auto res = Array<arrayType, location>(other.shape);
 								arrayType val;
 
-								uint64_t M = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, dataStart + offThis, sizeof(arrayType), cudaMemcpyDeviceToHost));
-								cuda::sub_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart + offOther, (unsigned int) M, res.dataStart, 1);
+								cudaSafeCall(cudaMemcpy(&val, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cuda::sub_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1717,13 +1771,13 @@ namespace rapid
 							{
 								auto res = Array<arrayType, location>(shape);
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t N = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t N = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
-								cuda::mul_array_array((unsigned int) math::prod(shape), dataStart + offThis, (unsigned int) M, other.dataStart + offOther, (unsigned int) N, res.dataStart, 1);
+								cuda::mul_array_array((unsigned int) math::prod(shape), dataStart, 1, other.dataStart, 1, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1753,14 +1807,14 @@ namespace rapid
 								auto res = Array<arrayType, location>(shape);
 								arrayType val;
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
-								cuda::mul_array_scalar((unsigned int) math::prod(shape), dataStart + offThis, (unsigned int) M, val, res.dataStart, 1);
+								cuda::mul_array_scalar((unsigned int) math::prod(shape), dataStart, 1, val, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1790,14 +1844,14 @@ namespace rapid
 								auto res = Array<arrayType, location>(other.shape);
 								arrayType val;
 
-								uint64_t M = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, dataStart + offThis, sizeof(arrayType), cudaMemcpyDeviceToHost));
-								cuda::mul_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart + offOther, (unsigned int) M, res.dataStart, 1);
+								cudaSafeCall(cudaMemcpy(&val, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cuda::mul_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1945,13 +1999,13 @@ namespace rapid
 							{
 								auto res = Array<arrayType, location>(shape);
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t N = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t N = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
-								cuda::div_array_array((unsigned int) math::prod(shape), dataStart + offThis, (unsigned int) M, other.dataStart + offOther, (unsigned int) N, res.dataStart, 1);
+								cuda::div_array_array((unsigned int) math::prod(shape), dataStart, 1, other.dataStart, 1, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -1981,14 +2035,14 @@ namespace rapid
 								auto res = Array<arrayType, location>(shape);
 								arrayType val;
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
-								cuda::div_array_scalar((unsigned int) math::prod(shape), dataStart + offThis, (unsigned int) M, val, res.dataStart, 1);
+								cuda::div_array_scalar((unsigned int) math::prod(shape), dataStart, 1, val, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -2018,14 +2072,14 @@ namespace rapid
 								auto res = Array<arrayType, location>(other.shape);
 								arrayType val;
 
-								uint64_t M = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, dataStart + offThis, sizeof(arrayType), cudaMemcpyDeviceToHost));
-								cuda::div_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart + offOther, (unsigned int) M, res.dataStart, 1);
+								cudaSafeCall(cudaMemcpy(&val, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cuda::div_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
 								return res;
 							}
 						#endif
@@ -2114,7 +2168,7 @@ namespace rapid
 						}
 					default:
 						{
-							message::RapidError("AdDivision Error", "Invalid division mode '" + std::to_string(mode) + "'").display();
+							message::RapidError("Division Error", "Invalid division mode '" + std::to_string(mode) + "'").display();
 						}
 				}
 			}
@@ -2143,10 +2197,10 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				auto res = Array<arrayType, location>(shape);
 
-				uint64_t M = useMatrixData ? matrixRows : 1;
-				uint64_t off = useMatrixData ? matrixAccess : 0;
+				// uint64_t M = useMatrixData ? matrixRows : 1;
+				// uint64_t off = useMatrixData ? matrixAccess : 0;
 
-				cuda::add_array_scalar((unsigned int) math::prod(shape), dataStart + off, (unsigned int) M, (arrayType) other, res.dataStart, 1);
+				cuda::add_array_scalar((unsigned int) math::prod(shape), dataStart, 1, (arrayType) other, res.dataStart, 1);
 				return res;
 			#endif
 			}
@@ -2174,7 +2228,7 @@ namespace rapid
 
 			#ifdef RAPID_CUDA
 				auto res = Array<arrayType, location>(shape);
-				cuda::sub_array_scalar((unsigned int) math::prod(shape), dataStart, (arrayType) other, res.dataStart);
+				cuda::sub_array_scalar((unsigned int) math::prod(shape), dataStart, 1, (arrayType) other, res.dataStart, 1);
 				return res;
 			#endif
 			}
@@ -2202,7 +2256,7 @@ namespace rapid
 
 			#ifdef RAPID_CUDA
 				auto res = Array<arrayType, location>(shape);
-				cuda::mul_array_scalar(math::prod(shape), dataStart, (arrayType) other, res.dataStart);
+				cuda::mul_array_scalar(math::prod(shape), dataStart, 1, (arrayType) other, res.dataStart, 1);
 				return res;
 			#endif
 			}
@@ -2230,7 +2284,7 @@ namespace rapid
 
 			#ifdef RAPID_CUDA
 				auto res = Array<arrayType, location>(shape);
-				cuda::div_array_scalar(math::prod(shape), dataStart, (arrayType) other, res.dataStart);
+				cuda::div_array_scalar(math::prod(shape), dataStart, 1, (arrayType) other, res.dataStart, 1);
 				return res;
 			#endif
 			}
@@ -2286,13 +2340,13 @@ namespace rapid
 						#ifdef RAPID_CUDA
 							else if (location == GPU)
 							{
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t N = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t N = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
-								cuda::add_array_array(math::prod(shape), dataStart + offThis, M, other.dataStart + offOther, N, dataStart + offThis, M);
+								cuda::add_array_array(math::prod(shape), dataStart, 1, other.dataStart, 1, dataStart, 1);
 								return *this;
 							}
 						#endif
@@ -2321,14 +2375,14 @@ namespace rapid
 							{
 								arrayType val;
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
-								cuda::add_array_scalar(math::prod(shape), dataStart + offThis, M, val, dataStart + offThis, M);
+								cuda::add_array_scalar(math::prod(shape), dataStart, 1, val, dataStart, 1);
 
 								return *this;
 							}
@@ -2414,13 +2468,13 @@ namespace rapid
 						#ifdef RAPID_CUDA
 							else if (location == GPU)
 							{
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t N = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t N = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
-								cuda::sub_array_array(math::prod(shape), dataStart + offThis, M, other.dataStart + offOther, N, dataStart + offThis, M);
+								cuda::sub_array_array(math::prod(shape), dataStart, 1, other.dataStart, 1, dataStart, 1);
 								return *this;
 							}
 						#endif
@@ -2449,14 +2503,14 @@ namespace rapid
 							{
 								arrayType val;
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
-								cuda::sub_array_scalar(math::prod(shape), dataStart + offThis, M, val, dataStart + offThis, M);
+								cuda::sub_array_scalar(math::prod(shape), dataStart, 1, val, dataStart, 1);
 
 								return *this;
 							}
@@ -2542,13 +2596,13 @@ namespace rapid
 						#ifdef RAPID_CUDA
 							else if (location == GPU)
 							{
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t N = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t N = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
-								cuda::mul_array_array(math::prod(shape), dataStart + offThis, M, other.dataStart + offOther, N, dataStart + offThis, M);
+								cuda::mul_array_array(math::prod(shape), dataStart, 1, other.dataStart, 1, dataStart, 1);
 								return *this;
 							}
 						#endif
@@ -2577,14 +2631,14 @@ namespace rapid
 							{
 								arrayType val;
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
-								cuda::mul_array_scalar(math::prod(shape), dataStart + offThis, M, val, dataStart + offThis, M);
+								cuda::mul_array_scalar(math::prod(shape), dataStart, 1, val, dataStart, 1);
 
 								return *this;
 							}
@@ -2670,13 +2724,13 @@ namespace rapid
 						#ifdef RAPID_CUDA
 							else if (location == GPU)
 							{
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t N = other.useMatrixData ? other.matrixRows : 1;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t N = other.useMatrixData ? other.matrixRows : 1;
 
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
-								cuda::div_array_array(math::prod(shape), dataStart + offThis, M, other.dataStart + offOther, N, dataStart + offThis, M);
+								cuda::div_array_array(math::prod(shape), dataStart, 1, other.dataStart, 1, dataStart, 1);
 								return *this;
 							}
 						#endif
@@ -2705,14 +2759,14 @@ namespace rapid
 							{
 								arrayType val;
 
-								uint64_t M = useMatrixData ? matrixRows : 1;
-								uint64_t offThis = useMatrixData ? matrixAccess : 0;
-								uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
+								// uint64_t M = useMatrixData ? matrixRows : 1;
+								// uint64_t offThis = useMatrixData ? matrixAccess : 0;
+								// uint64_t offOther = other.useMatrixData ? other.matrixAccess : 0;
 
 								cudaSafeCall(cudaDeviceSynchronize());
-								cudaSafeCall(cudaMemcpy(&val, other.dataStart + offOther, sizeof(arrayType), cudaMemcpyDeviceToHost));
+								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
-								cuda::div_array_scalar(math::prod(shape), dataStart + offThis, M, val, dataStart + offThis, M);
+								cuda::div_array_scalar(math::prod(shape), dataStart, 1, val, dataStart, 1);
 
 								return *this;
 							}
@@ -2761,7 +2815,7 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
 				{
-					cuda::add_array_scalar(math::prod(shape), dataStart, other, dataStart);
+					cuda::add_array_scalar(math::prod(shape), dataStart, 1, other, dataStart, 1);
 				}
 			#endif
 
@@ -2782,7 +2836,7 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
 				{
-					cuda::sub_array_scalar(math::prod(shape), dataStart, other, dataStart);
+					cuda::sub_array_scalar(math::prod(shape), dataStart, 1, other, dataStart, 1);
 				}
 			#endif
 
@@ -2803,7 +2857,7 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
 				{
-					cuda::mul_array_scalar(math::prod(shape), dataStart, other, dataStart);
+					cuda::mul_array_scalar(math::prod(shape), dataStar, 1, other, dataStart, 1);
 				}
 			#endif
 
@@ -2824,7 +2878,7 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
 				{
-					cuda::div_array_scalar(math::prod(shape), dataStart, other, dataStart);
+					cuda::div_array_scalar(math::prod(shape), dataStart, 1, other, dataStart, 1);
 				}
 			#endif
 
@@ -2849,10 +2903,10 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else
 				{
-					uint64_t M = useMatrixData ? matrixRows : 1;
-					uint64_t off = useMatrixData ? matrixAccess : 0;
+					// uint64_t M = useMatrixData ? matrixRows : 1;
+					// uint64_t off = useMatrixData ? matrixAccess : 0;
 
-					cuda::fill((unsigned int) math::prod(shape), dataStart + off, (unsigned int) M, val);
+					cuda::fill((unsigned int) math::prod(shape), dataStart, 1, val);
 				}
 			#endif
 			}
@@ -2867,7 +2921,7 @@ namespace rapid
 			/// </summary>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			inline Array<arrayType, location> dot(const Array<arrayType, location> &other) const
+			inline Array<arrayType, location> dot(Array<arrayType, location> other)
 			{
 				rapidAssert(shape.size() == other.shape.size(), "Invalid number of dimensions for array dot math::product");
 				uint64_t dims = shape.size();
@@ -2898,9 +2952,9 @@ namespace rapid
 								const size_t N = shape[1];
 								const size_t K = other.shape[1];
 
-								const arrayType *__restrict a = dataStart;
-								const arrayType *__restrict b = other.dataStart;
-								arrayType *__restrict c = res.dataStart;
+								const arrayType * a = dataStart;
+								const arrayType * b = other.dataStart;
+								arrayType * c = res.dataStart;
 
 								imp::rapid_gemm(M, N, K, a, b, c);
 
@@ -2915,7 +2969,7 @@ namespace rapid
 
 								for (uint64_t i = 0; i < shape[0]; i++)
 								{
-									res[i] = (operator[](i).dot(other[i]));
+									res[i] = (*this)[i].dot(other[i]);
 								}
 
 								return res;
@@ -2962,9 +3016,9 @@ namespace rapid
 									size_t N = shape[1];
 									size_t K = other.shape[1];
 
-									const arrayType *__restrict a = dataStart;
-									const arrayType *__restrict b = other.dataStart;
-									arrayType *__restrict c = res.dataStart;
+									const arrayType * a = dataStart;
+									const arrayType * b = other.dataStart;
+									arrayType * c = res.dataStart;
 
 									size_t i, j, k;
 									arrayType tmp;
@@ -2990,9 +3044,9 @@ namespace rapid
 									auto N = (long long) shape[1];
 									auto K = (long long) other.shape[1];
 
-									const arrayType *__restrict a = dataStart;
-									const arrayType *__restrict b = other.dataStart;
-									arrayType *__restrict c = res.dataStart;
+									const arrayType * a = dataStart;
+									const arrayType * b = other.dataStart;
+									arrayType * c = res.dataStart;
 
 									long long i, j, k;
 									arrayType tmp;
@@ -3118,8 +3172,15 @@ namespace rapid
 								arrayType dotAlpha = 1;
 								arrayType dotBeta = 0;
 
+								toColumMajor_inplace();
+								other.toColumMajor_inplace();
+
 								cudaSafeCall(cudaDeviceSynchronize());
 								cuda::gemm(handle::handle, CUBLAS_OP_N, CUBLAS_OP_N, m, k, n, &dotAlpha, dataStart, m, other.dataStart, n, &dotBeta, res.dataStart, m);
+
+								toRowMajor_inplace();
+								other.toRowMajor_inplace();
+								res.toRowMajor_inplace();
 
 								return res;
 							}
@@ -3131,7 +3192,7 @@ namespace rapid
 								Array<arrayType, location> res(resShape);
 
 								for (uint64_t i = 0; i < shape[0]; i++)
-									res[i] = (operator[](i).dot(other[i]));
+									res[i] = (*this)[i].dot(other[i]);
 
 								return res;
 							}
@@ -3446,30 +3507,25 @@ namespace rapid
 				else
 					zeroDim = false;
 
-				arrayType *newDataStart;
-				auto newOriginCount = new uint64_t(1);
+				// 				arrayType *newDataStart;
+				// 				auto newOriginCount = new uint64_t(1);
+				// 
+				// 				if (location == CPU)
+				// 				{
+				// 					newDataStart = new arrayType[math::prod(shape)];
+				// 					memcpy(newDataStart, dataStart, sizeof(arrayType) * math::prod(shape));
+				// 				}
+				// 			#ifdef RAPID_CUDA
+				// 				else if (location == GPU)
+				// 				{
+				// 					cudaSafeCall(cudaMalloc(&newDataStart, sizeof(arrayType) * math::prod(shape)));
+				// 					cudaSafeCall(cudaDeviceSynchronize());
+				// 					cudaSafeCall(cudaMemcpy(newDataStart, dataStart, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToDevice));
+				// 				}
+				// 			#endif
 
-				if (location == CPU)
-				{
-					newDataStart = new arrayType[math::prod(shape)];
-					memcpy(newDataStart, dataStart, sizeof(arrayType) * math::prod(shape));
-				}
-			#ifdef RAPID_CUDA
-				else if (location == GPU)
-				{
-					cudaSafeCall(cudaMalloc(&newDataStart, sizeof(arrayType) * math::prod(shape)));
-					cudaSafeCall(cudaDeviceSynchronize());
-					cudaSafeCall(cudaMemcpy(newDataStart, dataStart, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToDevice));
-				}
-			#endif
-
-				auto res = Array<arrayType, location>::fromData(tmpNewShape, newDataStart, newDataStart, newOriginCount, zeroDim);
-
-			#ifdef RAPID_CUDA
-				// If using CUDA, convert to column major
-				if (location == GPU)
-					res.toColumMajor_inplace();
-			#endif
+				(*originCount)++;
+				auto res = Array<arrayType, location>::fromData(tmpNewShape, dataOrigin, dataStart, originCount, zeroDim);
 
 				return res;
 			}
@@ -3553,7 +3609,7 @@ namespace rapid
 				res.dataOrigin = res.dataStart;
 
 				return res;
-			}
+				}
 
 			/// <summary>
 			/// Get a string representation of an array
@@ -3561,7 +3617,7 @@ namespace rapid
 			/// <typeparam name="t"></typeparam>
 			/// <returns></returns>
 			std::string toString(uint64_t startDepth = 0) const;
-		};
+			};
 
 		template<typename t, ArrayLocation loc>
 		std::ostream &operator<<(std::ostream &os, const Array<t, loc> &arr)
@@ -3629,7 +3685,7 @@ namespace rapid
 			}
 		#endif
 			return res;
-		}
+			}
 
 		/// <summary>
 		/// Reverse subtraction
@@ -3662,7 +3718,7 @@ namespace rapid
 		#endif
 
 			return res;
-		}
+			}
 
 		/// <summary>
 		/// Reverse multiplication
@@ -3694,7 +3750,7 @@ namespace rapid
 			}
 		#endif
 			return res;
-		}
+			}
 
 		/// <summary>
 		/// Reverse division
@@ -3726,7 +3782,7 @@ namespace rapid
 			}
 		#endif
 			return res;
-		}
+			}
 
 		template<typename t, ArrayLocation loc>
 		inline Array<t, loc> minimum(const Array<t, loc> &arr, t x)
@@ -3746,7 +3802,7 @@ namespace rapid
 				return res;
 			}
 		#endif
-		}
+			}
 
 		template<typename t, ArrayLocation loc>
 		inline Array<t, loc> maximum(const Array<t, loc> &arr, t x)
@@ -3766,7 +3822,7 @@ namespace rapid
 				return res;
 			}
 		#endif
-		}
+			}
 
 		/// <summary>
 		/// Sum all of the elements of an array
@@ -3800,7 +3856,7 @@ namespace rapid
 				return res;
 			}
 		#endif
-		}
+			}
 
 		/// <summary>
 		/// Calculate the exponent of every value
@@ -3835,7 +3891,7 @@ namespace rapid
 		#endif
 
 			return result;
-		}
+			}
 
 		/// <summary>
 		/// Square every element in an array and return
@@ -3870,7 +3926,7 @@ namespace rapid
 		#endif
 
 			return result;
-		}
+			}
 
 		/// <summary>
 		/// Square root every element in an array
@@ -3905,7 +3961,7 @@ namespace rapid
 		#endif
 
 			return result;
-		}
+			}
 
 		/// <summary>
 		/// Raise an array to a power
@@ -3940,7 +3996,7 @@ namespace rapid
 		#endif
 
 			return result;
-		}
+			}
 
 		template<typename t, ArrayLocation loc>
 		inline Array<t, loc> sin(const Array<t, loc> &arr)
@@ -4189,5 +4245,5 @@ namespace rapid
 
 			return res;
 		}
-	}
-}
+		}
+		}
