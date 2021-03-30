@@ -3504,7 +3504,7 @@ namespace rapid
 			else if (loc == GPU)
 			{
 				auto res = Array<t, loc>(other.shape);
-				cuda::div_scalar_array(math::prod(other.shape), val, other.dataStart, res.dataStart);
+				cuda::div_scalar_array(math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
 				return res;
 			}
 		#endif
@@ -3525,7 +3525,7 @@ namespace rapid
 			else if (loc == GPU)
 			{
 				auto res = Array<t, loc>(arr.shape);
-				cuda::array_minimum(math::prod(arr.shape), arr.dataStart, x, res.dataStart);
+				cuda::array_minimum(math::prod(arr.shape), arr.dataStart, 1, x, res.dataStart, 1);
 				return res;
 			}
 		#endif

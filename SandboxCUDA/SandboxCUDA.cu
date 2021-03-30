@@ -10,21 +10,6 @@
 
 int main()
 {
-	// FUNCTIONS MUST TAKE INTO ACCOUNT "MATRIX DATA"
-	// Addition, etc.
-	// To string
-	// Others???
-
-	/*
-	
-	Test everything -- every possible combination of values!?
-
-	Maximum and minimum for GPU arrays
-
-	Reverse grid addition
-
-	*/
-
 	using rapid::ndarray::CPU;
 	using rapid::ndarray::GPU;
 
@@ -60,12 +45,14 @@ int main()
 		auto config = res.config;
 	
 		std::cout << "Timing:\n";
-		START_TIMER(0, 2000);
+		START_TIMER(0, 100);
 		res = optimizer->apply(w, dw, config);
 		w.set(res.weight);
 		config = res.config;
 		END_TIMER(0);
 	}
+
+	std::cout << rapid::ndarray::minimum(rapid::ndarray::Array<double, CPU>::fromData({1, 2, 3, 4, 5}), 3.) << "\n";
 
 	return 0;
 }
