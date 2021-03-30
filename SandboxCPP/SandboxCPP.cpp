@@ -31,23 +31,23 @@ int main()
 		std::cout << w.toString() << "\n\n";
 	}
 
-	{
-		auto w = rapid::ndarray::Array<networkType, networkLocation>({3000, 3000});
-		auto dw = rapid::ndarray::onesLike(w);
-		w.fill(0.5);
-		auto optimizer = std::make_shared<rapid::network::optim::adam<networkType, networkLocation>>();
-
-		auto res = optimizer->apply(w, dw);
-		w.set(res.weight);
-		auto config = res.config;
-
-		std::cout << "Timing:\n";
-		START_TIMER(0, 100);
-		res = optimizer->apply(w, dw, config);
-		w.set(res.weight);
-		config = res.config;
-		END_TIMER(0);
-	}
+// 	{
+// 		auto w = rapid::ndarray::Array<networkType, networkLocation>({3000, 3000});
+// 		auto dw = rapid::ndarray::onesLike(w);
+// 		w.fill(0.5);
+// 		auto optimizer = std::make_shared<rapid::network::optim::adam<networkType, networkLocation>>();
+// 
+// 		auto res = optimizer->apply(w, dw);
+// 		w.set(res.weight);
+// 		auto config = res.config;
+// 
+// 		std::cout << "Timing:\n";
+// 		START_TIMER(0, 100);
+// 		res = optimizer->apply(w, dw, config);
+// 		w.set(res.weight);
+// 		config = res.config;
+// 		END_TIMER(0);
+// 	}
 
 	return 0;
 }

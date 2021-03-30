@@ -202,9 +202,9 @@ namespace rapid
 		{
 		public:
 			std::vector<size_t> shape;
-			arrayType *dataOrigin;
-			arrayType *dataStart;
-			size_t *originCount;
+			arrayType *dataOrigin = nullptr;
+			arrayType *dataStart = nullptr;
+			size_t *originCount = nullptr;
 			bool isZeroDim;
 
 			// #ifdef RAPID_CUDA
@@ -673,7 +673,9 @@ namespace rapid
 				dataOrigin = other.dataOrigin;
 				dataStart = other.dataStart;
 				originCount = other.originCount;
-				(*originCount)++;
+
+				if (originCount)
+					(*originCount)++;
 			}
 
 			/// <summary>
@@ -686,6 +688,10 @@ namespace rapid
 			Array<arrayType, location> &operator=(const Array<arrayType, location> &other)
 			{
 				rapidAssert(shape == other.shape, "Invalid shape for array setting");
+
+				if (!other.originCount)
+					return *this;
+
 				if (location == CPU)
 					memcpy(dataStart, other.dataStart, math::prod(shape) * sizeof(arrayType));
 			#ifdef RAPID_CUDA
@@ -713,7 +719,7 @@ namespace rapid
 		#ifdef RAPID_CUDA
 			/// <summary>
 			/// Convert the data in an array to row-major format from
-			/// column-major format, and return the result. The resut
+			/// column-major format, and return the result. The result
 			/// array is not linked in any way to the parent
 			/// </summary>
 			/// <returns></returns>
@@ -951,18 +957,22 @@ namespace rapid
 			/// </summary>
 			inline void freeSelf()
 			{
-				// Only delete data if originCount becomes zero
-				(*originCount)--;
-
-				if ((*originCount) == 0)
+				// Ensure the array is initialized
+				if (originCount)
 				{
-					if (location == CPU)
-						delete[] dataOrigin;
-				#ifdef RAPID_CUDA
-					else
-						cudaSafeCall(cudaFree(dataOrigin));
-				#endif
-					delete originCount;
+					// Only delete data if originCount becomes zero
+					(*originCount)--;
+
+					if ((*originCount) == 0)
+					{
+						if (location == CPU)
+							delete[] dataOrigin;
+					#ifdef RAPID_CUDA
+						else
+							cudaSafeCall(cudaFree(dataOrigin));
+					#endif
+						delete originCount;
+					}
 				}
 			}
 
@@ -1109,7 +1119,7 @@ namespace rapid
 				else if (location == GPU)
 				{
 					auto res = Array<arrayType, location>(shape);
-					cuda::sub_scalar_array((unsigned int) math::prod(shape), 0, 1, dataStart, 1, res.dataStart, 1);
+					cuda::sub_scalar_array((unsigned int) math::prod(shape), 0, dataStart, 1, res.dataStart, 1);
 					return res;
 				}
 			#endif
@@ -1794,7 +1804,7 @@ namespace rapid
 																			   math::prod(shape) > 1000000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 																			   [](arrayType x, arrayType y)
 								{
-									return x - y;
+									return x / y;
 								});
 
 								return res;
@@ -3462,7 +3472,7 @@ namespace rapid
 			else if (loc == GPU)
 			{
 				auto res = Array<t, loc>(other.shape);
-				cuda::mul_scalar_array(math::prod(other.shape), val, other.dataStart, res.dataStart);
+				cuda::mul_scalar_array(math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
 				return res;
 			}
 		#endif
@@ -3673,7 +3683,7 @@ namespace rapid
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
-				cuda::array_square(math::prod(arr.shape), arr.dataStart, result.dataStart);
+				cuda::array_square(math::prod(arr.shape), arr.dataStart, 1, result.dataStart, 1);
 			}
 		#endif
 

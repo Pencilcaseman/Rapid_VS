@@ -258,7 +258,7 @@ namespace rapid
 						config.v.defaultValue.set(ndarray::zerosLike(x));
 						config.t = 0;
 					}
-					 
+
 					auto m = config.m.getValue();
 					auto v = config.v.getValue();
 					auto t = config.t;
