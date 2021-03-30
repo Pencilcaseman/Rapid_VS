@@ -14,45 +14,33 @@ int main()
 	using rapid::ndarray::GPU;
 
 	using networkType = float;
-	const rapid::ndarray::ArrayLocation networkLocation = GPU;
+	const rapid::ndarray::ArrayLocation networkLocation = CPU;
 
-	auto w = rapid::ndarray::Array<networkType, networkLocation>({5, 5});
-	auto dw = rapid::ndarray::onesLike(w);
-	w.fill(0.5);
-	auto optimizer = std::make_shared<rapid::network::optim::adam<networkType, networkLocation>>();
+	auto a = rapid::ndarray::arange(1.f, 10.f, 1.f).reshaped({3, 3});
+	auto b = rapid::ndarray::Array<float, CPU>::fromData({1, 2, 3});
 
-	auto res = optimizer->apply(w, dw);
-	w.set(res.weight);
-	rapid::network::optim::Config<networkType, networkLocation> config = res.config;
+	// std::cout << a << "\n\n";
+	// std::cout << b << "\n\n";
+	// std::cout << b.dot(b) << "\n\n";
+	// std::cout << a.dot(b) << "\n\n";
 
-	std::cout << w.toString() << "\n\n";
-	for (int i = 0; i < 5; i++)
-	{
-		res = optimizer->apply(w, dw, config);
-		w.set(res.weight);
-		config = res.config;
-		std::cout << w.toString() << "\n\n";
-	}
-
-	{
-		auto w = rapid::ndarray::Array<networkType, networkLocation>({1000, 1000});
-		auto dw = rapid::ndarray::onesLike(w);
-		w.fill(0.5);
-		auto optimizer = std::make_shared<rapid::network::optim::adam<networkType, networkLocation>>();
-	
-		auto res = optimizer->apply(w, dw);
-		w.set(res.weight);
-		auto config = res.config;
-	
-		std::cout << "Timing:\n";
-		START_TIMER(0, 100);
-		res = optimizer->apply(w, dw, config);
-		w.set(res.weight);
-		config = res.config;
-		END_TIMER(0);
-	}
-
-	std::cout << rapid::ndarray::minimum(rapid::ndarray::Array<double, CPU>::fromData({1, 2, 3, 4, 5}), 3.) << "\n";
+	// auto x = rapid::ndarray::Array<networkType, networkLocation>({5, 3, 3, 3});
+	// auto w = rapid::ndarray::Array<networkType, networkLocation>({3 * 3 * 3, 5});
+	// auto b = rapid::ndarray::Array<networkType, networkLocation>({5});
+	// 
+	// x.fill(0.5);
+	// w.fill(-0.5);
+	// b.fill(0.75);
+	// 
+	// auto res = rapid::network::affineForward(x, w, b);
+	// 
+	// auto dOut = rapid::ndarray::zerosLike(res.out);
+	// 
+	// auto backwardRes = rapid::network::affineBackward(dOut, res.cache);
+	// 
+	// std::cout << backwardRes.delta.x << "\n\n";
+	// std::cout << backwardRes.delta.w << "\n\n";
+	// std::cout << backwardRes.delta.b << "\n\n";
 
 	return 0;
 }

@@ -32,6 +32,11 @@ namespace rapid
 			ndarray::Array<t, loc> b;
 		};
 
+		/// <summary>
+		/// Contains all of the required information for an
+		/// affine forward pass
+		/// </summary>
+		/// <typeparam name="t"></typeparam>
 		template<typename t, ndarray::ArrayLocation loc>
 		struct AffineOutput
 		{
@@ -39,15 +44,52 @@ namespace rapid
 			Cache<t, loc> cache;
 		};
 
+		/// <summary>
+		/// Contains the information required for a backward
+		/// pass of an affine network layer
+		/// </summary>
+		/// <typeparam name="t"></typeparam>
+		template<typename t, ndarray::ArrayLocation loc>
+		struct AffineBackwardOutput
+		{
+			Cache<t, loc> delta;
+		};
+
+		/// <summary>
+		/// Compute a forward pass on an affine (fully connected)
+		/// layer, provided an input, weight and bias. The output
+		/// contains a cache of these values, as well as the actual
+		/// output from the computation
+		/// </summary>
+		/// <typeparam name="t"></typeparam>
+		/// <param name="x"></param>
+		/// <param name="w"></param>
+		/// <param name="b"></param>
+		/// <returns></returns>
 		template<typename t, ndarray::ArrayLocation loc>
 		inline AffineOutput<t, loc> affineForward(const ndarray::Array<t, loc> &x, const ndarray::Array<t, loc> &w, const ndarray::Array<t, loc> &b)
 		{
-			auto z = x.reshape({x.shape[0], AUTO});
-
-			std::cout << "info: " << z << "\n\n";
-
+			auto z = x.reshaped({x.shape[0], AUTO});
 			auto out = z.dot(w) + b;
 			return {out, {x, w, b}};
+		}
+
+		template<typename t, ndarray::ArrayLocation loc>
+		inline AffineBackwardOutput<t, loc> affineBackward(const ndarray::Array<t, loc> &dOut, const Cache<t, loc> &cache)
+		{
+			const auto &shapes = cache.x.shape;
+			const auto N = shapes[0];
+			auto z = cache.x.reshaped({N, AUTO});
+
+			std::cout << "Information\n";
+			std::cout << dOut << "\n\n";
+			std::cout << cache.w.transposed() << "\n";
+
+			auto dx = dOut.dot(cache.w.transposed()).reshaped(shapes);
+			auto dw = (z.transposed()).dot(dOut);
+			auto db = (ndarray::ones<t>({N})).dot(dOut);
+
+			return {{dx, dw, db}};
 		}
 	}
 }

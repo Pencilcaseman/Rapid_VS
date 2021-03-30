@@ -751,7 +751,7 @@ namespace rapid
 			/// <summary>
 			/// Column to row-major ordering in place
 			/// </summary>
-			inline void toRowMajor_inplace()
+			inline void toRowMajor_inplace() const
 			{
 				cudaSafeCall(cudaDeviceSynchronize());
 
@@ -771,7 +771,7 @@ namespace rapid
 			/// <summary>
 			/// Row to column-major ordering in place
 			/// </summary>
-			inline void toColumMajor_inplace()
+			inline void toColumMajor_inplace() const
 			{
 				cudaSafeCall(cudaDeviceSynchronize());
 
@@ -2676,9 +2676,25 @@ namespace rapid
 			/// </summary>
 			/// <param name="other"></param>
 			/// <returns></returns>
-			inline Array<arrayType, location> dot(Array<arrayType, location> other)
+			inline Array<arrayType, location> dot(const Array<arrayType, location> &other) const
 			{
-				rapidAssert(shape.size() == other.shape.size(), "Invalid number of dimensions for array dot math::product");
+				if (utils::subVector(shape, 1) == other.shape)
+				{
+					std::vector<uint64_t> resShape;
+					resShape.emplace_back(shape[0]);
+
+					if (other.shape.size() > 1)
+						resShape.insert(resShape.end(), other.shape.begin(), other.shape.end());
+
+					auto res = Array<arrayType, location>(resShape);
+
+					for (uint64_t i = 0; i < shape[0]; i++)
+						res[i] = (*this)[i].dot(other);
+
+					return res;
+				}
+
+				rapidAssert(shape.size() == other.shape.size(), "Invalid number of dimensions for array dot product");
 				uint64_t dims = shape.size();
 
 				if (location == CPU)
@@ -3020,8 +3036,8 @@ namespace rapid
 						else
 						{
 							int64_t i = 0, j = 0;
-							const arrayType *__restrict thisData = dataStart;
-							arrayType *__restrict resData = res.dataStart;
+							const arrayType * thisData = dataStart;
+							arrayType * resData = res.dataStart;
 							auto minCols = rapid::math::max(cols, 3) - 3;
 
 						#pragma omp parallel for private(i, j) shared(resData, thisData, minCols) default(none)
@@ -3350,6 +3366,22 @@ namespace rapid
 		std::ostream &operator<<(std::ostream &os, const Array<t, loc> &arr)
 		{
 			return os << arr.toString();
+		}
+
+		template<typename t, ArrayLocation loc = CPU>
+		inline Array<t, loc> zeros(const std::vector<uint64_t> &shape)
+		{
+			auto res = Array<t, loc>(shape);
+			res.fill(0);
+			return res;
+		}
+
+		template<typename t, ArrayLocation loc = CPU>
+		inline Array<t, loc> ones(const std::vector<uint64_t> &shape)
+		{
+			auto res = Array<t, loc>(shape);
+			res.fill(1);
+			return res;
 		}
 
 		/// <summary>
@@ -3852,8 +3884,8 @@ namespace rapid
 		/// <param name="end"></param>
 		/// <param name="inc"></param>
 		/// <returns></returns>
-		template<typename s, typename e, typename t>
-		inline Array<typename std::common_type<s, e, t>::type> arange(s start, e end, t inc = 1)
+		template<typename s, typename e, typename t, ArrayLocation loc = CPU>
+		inline Array<typename std::common_type<s, e, t>::type, loc> arange(s start, e end, t inc = 1)
 		{
 			using ct = typename std::common_type<s, e, t>::type;
 
@@ -3872,8 +3904,8 @@ namespace rapid
 		/// <typeparam name="e"></typeparam>
 		/// <param name="end"></param>
 		/// <returns></returns>
-		template<typename e>
-		inline Array<e, CPU> arange(e end)
+		template<typename e, ArrayLocation loc = CPU>
+		inline Array<e, loc> arange(e end)
 		{
 			return arange((e) 0, end, (e) 1);
 		}
