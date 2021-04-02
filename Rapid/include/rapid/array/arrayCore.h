@@ -620,12 +620,6 @@ namespace rapid
 					handle::createHandle();
 			#endif
 
-			#ifdef RAPID_DEBUG
-				for (const auto &val : arrShape)
-					if (val <= 0)
-						rapidAssert(false, "Dimensions must be positive");
-			#endif
-
 				if (arrShape.empty() || math::prod(arrShape) == 0)
 				{
 					isZeroDim = true;
@@ -2678,6 +2672,7 @@ namespace rapid
 			/// <returns></returns>
 			inline Array<arrayType, location> dot(const Array<arrayType, location> &other) const
 			{
+				// Matrix vector product
 				if (utils::subVector(shape, 1) == other.shape)
 				{
 					std::vector<uint64_t> resShape;
@@ -2690,6 +2685,23 @@ namespace rapid
 
 					for (uint64_t i = 0; i < shape[0]; i++)
 						res[i] = (*this)[i].dot(other);
+
+					return res;
+				}
+
+				// Reverse matrix vector product
+				if (shape == utils::subVector(other.shape, 1))
+				{
+					std::vector<uint64_t> resShape;
+					resShape.emplace_back(other.shape[0]);
+
+					if (shape.size() > 1)
+						resShape.insert(resShape.end(), shape.begin(), shape.end());
+
+					auto res = Array<arrayType, location>(resShape);
+
+					for (uint64_t i = 0; i < shape[0]; i++)
+						res[i] = other[i].dot((*this));
 
 					return res;
 				}
@@ -3018,7 +3030,7 @@ namespace rapid
 						return res;
 					}
 
-					if (shape.size() == 2)
+					if (shape.size() == 2 && shape != newDims)
 					{
 						auto res = Array<arrayType, location>(newDims);
 
@@ -3036,8 +3048,8 @@ namespace rapid
 						else
 						{
 							int64_t i = 0, j = 0;
-							const arrayType * thisData = dataStart;
-							arrayType * resData = res.dataStart;
+							const arrayType *thisData = dataStart;
+							arrayType *resData = res.dataStart;
 							auto minCols = rapid::math::max(cols, 3) - 3;
 
 						#pragma omp parallel for private(i, j) shared(resData, thisData, minCols) default(none)
@@ -3069,21 +3081,22 @@ namespace rapid
 
 					if (math::prod(shape) < 62000)
 					{
-						for (uint64_t i = 0; i < math::prod(shape); i++)
+						auto &tmpShape = shape;
+						for (int64_t i = 0; i < math::prod(tmpShape); i++)
 						{
 							if (axes.empty())
-								for (uint64_t j = 0; j < shape.size(); j++)
-									indicesRes[j] = indices[shape.size() - j - 1];
+								for (int64_t j = 0; j < tmpShape.size(); j++)
+									indicesRes[j] = indices[tmpShape.size() - j - 1];
 							else
-								for (uint64_t j = 0; j < shape.size(); j++)
+								for (int64_t j = 0; j < tmpShape.size(); j++)
 									indicesRes[j] = indices[axes[j]];
 
-							res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(shape, indices)];
+							res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(tmpShape, indices)];
 
-							indices[shape.size() - 1]++;
-							uint64_t index = shape.size() - 1;
+							indices[tmpShape.size() - 1]++;
+							int64_t index = tmpShape.size() - 1;
 
-							while (indices[index] >= shape[index] && index > 0)
+							while (indices[index] >= tmpShape[index] && index > 0)
 							{
 								indices[index] = 0;
 								index--;
@@ -3093,7 +3106,7 @@ namespace rapid
 					}
 					else
 					{
-						auto tmpShape = shape;
+						auto &tmpShape = shape;
 						for (int64_t i = 0; i < math::prod(tmpShape); i++)
 						{
 							if (axes.empty())
@@ -3577,7 +3590,47 @@ namespace rapid
 			else if (loc == GPU)
 			{
 				auto res = Array<t, loc>(arr.shape);
-				cuda::array_maximum(math::prod(arr.shape), arr.dataStart, x, res.dataStart);
+				cuda::array_maximum(math::prod(arr.shape), arr.dataStart, 1, x, res.dataStart, 1);
+				return res;
+			}
+		#endif
+		}
+
+		template<typename t, ArrayLocation loc>
+		inline Array<t, loc> less(const Array<t, loc> &arr, t x)
+		{
+			if (loc == CPU)
+			{
+				return arr.mapped([&](t val)
+				{
+					return val < x ? 1 : 0;
+				});
+			}
+		#ifdef RAPID_CUDA
+			else if (loc == GPU)
+			{
+				auto res = Array<t, loc>(arr.shape);
+				cuda::array_less(math::prod(arr.shape), arr.dataStart, 1, x, res.dataStart, 1);
+				return res;
+			}
+		#endif
+		}
+
+		template<typename t, ArrayLocation loc>
+		inline Array<t, loc> greater(const Array<t, loc> &arr, t x)
+		{
+			if (loc == CPU)
+			{
+				return arr.mapped([&](t val)
+				{
+					return val > x ? 1 : 0;
+				});
+			}
+		#ifdef RAPID_CUDA
+			else if (loc == GPU)
+			{
+				auto res = Array<t, loc>(arr.shape);
+				cuda::array_greater(math::prod(arr.shape), arr.dataStart, 1, x, res.dataStart, 1);
 				return res;
 			}
 		#endif
@@ -3615,6 +3668,58 @@ namespace rapid
 				return res;
 			}
 		#endif
+		}
+
+		template<typename t, ArrayLocation loc>
+		inline Array<t, loc> mean(const Array<t, loc> &arr, uint64_t axis = (uint64_t) -1, int depth = 0)
+		{
+			// Mean of all values
+			if (axis == (uint64_t) -1 || arr.shape.size() == 1)
+			{
+				Array<t, loc> res({0});
+				res.dataStart[0] = sum(arr) / math::prod(arr.shape);
+				return res;
+			}
+
+			rapidAssert(axis < arr.shape.size(), "Axis '" + std::to_string(axis) +
+						"' is out of bounds for array with '" + std::to_string(arr.shape.size()) +
+						"' dimensions");
+
+			// Axis is defined, so compute along provided axis
+			//  > 0 => Compute mean along rows      \   ONLY FOR
+			//  > 1 => Compute mean long columns    /   A MATRIX
+
+			std::vector<uint64_t> resShape;
+			for (uint64_t i = 0; i < arr.shape.size(); i++)
+				if (i != axis)
+					resShape.emplace_back(arr.shape[i]);
+
+			Array<t, loc> res(resShape);
+
+			std::vector<uint64_t> transposeOrder(arr.shape.size());
+
+			if (depth == 0)
+			{
+				for (uint64_t i = 0; i < axis; i++)
+					transposeOrder[i] = i;
+
+				for (uint64_t i = axis; i < arr.shape.size() - 1; i++)
+					transposeOrder[i] = depth == 0 ? (i + 1) : i;
+
+				transposeOrder[transposeOrder.size() - 1] = axis;
+			}
+			else
+			{
+				for (uint64_t i = 0; i < arr.shape.size(); i++)
+					transposeOrder[i] = i;
+			}
+			 
+			auto fixed = arr.transposed(transposeOrder);
+
+			for (uint64_t outer = 0; outer < res.shape[0]; outer++)
+				res[outer] = mean(fixed[outer], 0, depth + 1);
+
+			return res;
 		}
 
 		/// <summary>
@@ -3875,7 +3980,7 @@ namespace rapid
 		/// <summary>
 		/// Create a vector of a specified type, where the values
 		/// increase/decrease linearly between a start and end
-		/// point by an specified
+		/// point by a specified amount
 		/// </summary>
 		/// <typeparam name="s"></typeparam>
 		/// <typeparam name="e"></typeparam>
@@ -3884,13 +3989,13 @@ namespace rapid
 		/// <param name="end"></param>
 		/// <param name="inc"></param>
 		/// <returns></returns>
-		template<typename s, typename e, typename t, ArrayLocation loc = CPU>
-		inline Array<typename std::common_type<s, e, t>::type, loc> arange(s start, e end, t inc = 1)
+		template<ArrayLocation loc = CPU, typename s, typename e>
+		inline Array<typename std::common_type<s, e>::type, loc> arange(s start, e end, typename std::common_type<s, e>::type inc = 1)
 		{
-			using ct = typename std::common_type<s, e, t>::type;
+			using ct = typename std::common_type<s, e>::type;
 
 			auto len = (uint64_t) ceil(abs((ct) end - (ct) start) / (ct) inc);
-			auto res = Array<t, CPU>({len});
+			auto res = Array<typename std::common_type<s, e>::type, loc>({len});
 			for (uint64_t i = 0; i < len; i++)
 				res[i] = (ct) start + (ct) inc * (ct) i;
 			return res;
@@ -3904,7 +4009,7 @@ namespace rapid
 		/// <typeparam name="e"></typeparam>
 		/// <param name="end"></param>
 		/// <returns></returns>
-		template<typename e, ArrayLocation loc = CPU>
+		template<ArrayLocation loc = CPU, typename e>
 		inline Array<e, loc> arange(e end)
 		{
 			return arange((e) 0, end, (e) 1);

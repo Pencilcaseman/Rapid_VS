@@ -481,6 +481,54 @@ namespace rapid
 				}
 
 				__global__
+					void array_less_float(unsigned int size, const float *arr, const unsigned int M, const float val, float *res, const unsigned int N)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < size; i += stride)
+					{
+						res[i * N] = arr[i * M] < val ? 1 : 0;
+					}
+				}
+
+				__global__
+					void array_less_double(unsigned int size, const double *arr, const unsigned int M, const double val, double *res, const unsigned int N)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < size; i += stride)
+					{
+						res[i * N] = arr[i * M] < val ? 1 : 0;
+					}
+				}
+
+				__global__
+					void array_greater_float(unsigned int size, const float *arr, const unsigned int M, const float val, float *res, const unsigned int N)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < size; i += stride)
+					{
+						res[i * N] = arr[i * M] > val ? 1 : 0;
+					}
+				}
+
+				__global__
+					void array_greater_double(unsigned int size, const double *arr, const unsigned int M, const double val, double *res, const unsigned int N)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < size; i += stride)
+					{
+						res[i * N] = arr[i * M] > val ? 1 : 0;
+					}
+				}
+
+				__global__
 					void array_exp_float(unsigned int size, const float *arr, const unsigned int M, float *res, const unsigned int N)
 				{
 					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -1053,6 +1101,54 @@ namespace rapid
 					cudaSafeCall(cudaDeviceSynchronize());
 
 				kernel::array_maximum_double << <numBlocks, blockSize >> > (size, arr, M, val, res, N);
+			}
+
+			inline void array_less(unsigned int size, const float *arr, const unsigned int M, const float val, float *res, const unsigned int N, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (size + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::array_less_float << <numBlocks, blockSize >> > (size, arr, M, val, res, N);
+			}
+
+			inline void array_less(unsigned int size, const double *arr, const unsigned int M, const double val, double *res, const unsigned int N, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (size + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::array_less_double << <numBlocks, blockSize >> > (size, arr, M, val, res, N);
+			}
+
+			inline void array_greater(unsigned int size, const float *arr, const unsigned int M, const float val, float *res, const unsigned int N, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (size + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::array_greater_float << <numBlocks, blockSize >> > (size, arr, M, val, res, N);
+			}
+
+			inline void array_greater(unsigned int size, const double *arr, const unsigned int M, const double val, double *res, const unsigned int N, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (size + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::array_greater_double << <numBlocks, blockSize >> > (size, arr, M, val, res, N);
 			}
 
 			inline void array_exp(unsigned int size, const float *arr, const unsigned int M, float *res, const unsigned int N, int sync = 1)

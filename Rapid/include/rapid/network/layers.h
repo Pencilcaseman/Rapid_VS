@@ -55,6 +55,42 @@ namespace rapid
 			Cache<t, loc> delta;
 		};
 
+		
+		template<typename t, ndarray::ArrayLocation loc>
+		struct ReluOutput
+		{
+			ndarray::Array<t, loc> out;
+			Cache<t, loc> cache;
+		};
+
+		template<typename t, ndarray::ArrayLocation loc>
+		struct ReluBackwardOutput
+		{
+			ndarray::Array<t, loc> dx;
+		};
+
+		template<typename t, ndarray::ArrayLocation loc>
+		struct BatchNormParam
+		{
+			int mode;
+			t eps;
+			t momentum;
+			ndarray::Array<t, loc> runningMean;
+			ndarray::Array<t, loc> runningVariance;
+		};
+
+		template<typename t, ndarray::ArrayLocation loc>
+		struct BatchNormCache
+		{
+			ndarray::Array<t, loc> xNorm;
+			t gamma;
+			t beta;
+			ndarray::Array<t, loc> sample_mean;
+			ndarray::Array<t, loc> sample_variance;
+			ndarray::Array<t, loc> x;
+			t eps;
+		};
+
 		/// <summary>
 		/// Compute a forward pass on an affine (fully connected)
 		/// layer, provided an input, weight and bias. The output
@@ -77,19 +113,36 @@ namespace rapid
 		template<typename t, ndarray::ArrayLocation loc>
 		inline AffineBackwardOutput<t, loc> affineBackward(const ndarray::Array<t, loc> &dOut, const Cache<t, loc> &cache)
 		{
+			std::cout << "Information\n";
+			std::cout << cache.x << "\n\n";
+
 			const auto &shapes = cache.x.shape;
 			const auto N = shapes[0];
 			auto z = cache.x.reshaped({N, AUTO});
 
-			std::cout << "Information\n";
+			std::cout << "More information\n";
 			std::cout << dOut << "\n\n";
-			std::cout << cache.w.transposed() << "\n";
+			std::cout << cache.w << "\n\n";
 
 			auto dx = dOut.dot(cache.w.transposed()).reshaped(shapes);
 			auto dw = (z.transposed()).dot(dOut);
 			auto db = (ndarray::ones<t>({N})).dot(dOut);
 
 			return {{dx, dw, db}};
+		}
+
+		template<typename t, ndarray::ArrayLocation loc>
+		inline ReluOutput<t, loc> reluForward(const ndarray::Array<t, loc> &x)
+		{
+			auto out = relu(x);
+			return {out, x};
+		}
+
+		template<typename t, ndarray::ArrayLocation loc>
+		inline ReluBackwardOutput<t, loc> reluBackward(const ndarray::Array<t, loc> &dOut, const ndarray::Array<t, loc> &cache)
+		{
+			auto dx = ndarray::greater(cache, 0) * dOut;
+			return {dx};
 		}
 	}
 }

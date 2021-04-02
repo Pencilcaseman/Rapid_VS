@@ -16,14 +16,6 @@ int main()
 	using networkType = float;
 	const rapid::ndarray::ArrayLocation networkLocation = CPU;
 
-	auto a = rapid::ndarray::arange(1.f, 10.f, 1.f).reshaped({3, 3});
-	auto b = rapid::ndarray::Array<float, CPU>::fromData({1, 2, 3});
-
-	// std::cout << a << "\n\n";
-	// std::cout << b << "\n\n";
-	// std::cout << b.dot(b) << "\n\n";
-	// std::cout << a.dot(b) << "\n\n";
-
 	// auto x = rapid::ndarray::Array<networkType, networkLocation>({5, 3, 3, 3});
 	// auto w = rapid::ndarray::Array<networkType, networkLocation>({3 * 3 * 3, 5});
 	// auto b = rapid::ndarray::Array<networkType, networkLocation>({5});
@@ -41,6 +33,16 @@ int main()
 	// std::cout << backwardRes.delta.x << "\n\n";
 	// std::cout << backwardRes.delta.w << "\n\n";
 	// std::cout << backwardRes.delta.b << "\n\n";
+
+	/************************************************************************/
+	/* This part nearly works. Fix the transpose mechanism.                 */
+	/************************************************************************/
+	auto arr = rapid::ndarray::arange(1.f, 9.f).reshaped({2, 2, 2});
+	std::cout << arr << "\n\n";
+	std::cout << rapid::ndarray::mean(arr) << "\n\n";
+	std::cout << rapid::ndarray::mean(arr, 0) << "\n\n";
+	std::cout << rapid::ndarray::mean(arr, 1) << "\n\n";
+	std::cout << rapid::ndarray::mean(arr, 2) << "\n\n";
 
 	return 0;
 }
