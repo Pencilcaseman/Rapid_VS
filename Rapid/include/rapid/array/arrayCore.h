@@ -3685,17 +3685,6 @@ namespace rapid
 						"' is out of bounds for array with '" + std::to_string(arr.shape.size()) +
 						"' dimensions");
 
-			// Axis is defined, so compute along provided axis
-			//  > 0 => Compute mean along rows      \   ONLY FOR
-			//  > 1 => Compute mean long columns    /   A MATRIX
-
-			std::vector<uint64_t> resShape;
-			for (uint64_t i = 0; i < arr.shape.size(); i++)
-				if (i != axis)
-					resShape.emplace_back(arr.shape[i]);
-
-			Array<t, loc> res(resShape);
-
 			std::vector<uint64_t> transposeOrder(arr.shape.size());
 
 			if (depth == 0)
@@ -3713,11 +3702,17 @@ namespace rapid
 				for (uint64_t i = 0; i < arr.shape.size(); i++)
 					transposeOrder[i] = i;
 			}
-			 
+
 			auto fixed = arr.transposed(transposeOrder);
 
+			std::vector<uint64_t> resShape;
+			for (uint64_t i = 0; i < transposeOrder.size() - 1; i++)
+				resShape.emplace_back(arr.shape[transposeOrder[i]]);
+
+			Array<t, loc> res(resShape);
+
 			for (uint64_t outer = 0; outer < res.shape[0]; outer++)
-				res[outer] = mean(fixed[outer], 0, depth + 1);
+				res[outer] = mean(fixed[outer], math::max(axis, 1) - 1, depth + 1);
 
 			return res;
 		}
@@ -3781,7 +3776,7 @@ namespace rapid
 				{
 					return x * x;
 				});
-			}
+		}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
@@ -3790,7 +3785,7 @@ namespace rapid
 		#endif
 
 			return result;
-		}
+	}
 
 		/// <summary>
 		/// Square root every element in an array
@@ -3816,7 +3811,7 @@ namespace rapid
 				{
 					return std::sqrt(x);
 				});
-			}
+		}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
@@ -3825,7 +3820,7 @@ namespace rapid
 		#endif
 
 			return result;
-		}
+}
 
 		/// <summary>
 		/// Raise an array to a power
@@ -3851,7 +3846,7 @@ namespace rapid
 				{
 					return std::pow(x, power);
 				});
-			}
+		}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
@@ -4109,5 +4104,5 @@ namespace rapid
 
 			return res;
 		}
-	}
-}
+		}
+		}

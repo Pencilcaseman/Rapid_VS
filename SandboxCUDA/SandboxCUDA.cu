@@ -37,7 +37,7 @@ int main()
 	/************************************************************************/
 	/* This part nearly works. Fix the transpose mechanism.                 */
 	/************************************************************************/
-	auto arr = rapid::ndarray::arange(1.f, 9.f).reshaped({2, 2, 2});
+	auto arr = rapid::ndarray::arange(1.f, 25.f).reshaped({2, 3, 4});
 	std::cout << arr << "\n\n";
 	std::cout << rapid::ndarray::mean(arr) << "\n\n";
 	std::cout << rapid::ndarray::mean(arr, 0) << "\n\n";
