@@ -39,10 +39,10 @@ int main()
 	/************************************************************************/
 	auto arr = rapid::ndarray::arange(1.f, 25.f).reshaped({2, 3, 4});
 	std::cout << arr << "\n\n";
-	std::cout << rapid::ndarray::mean(arr) << "\n\n";
-	std::cout << rapid::ndarray::mean(arr, 0) << "\n\n";
-	std::cout << rapid::ndarray::mean(arr, 1) << "\n\n";
-	std::cout << rapid::ndarray::mean(arr, 2) << "\n\n";
+	std::cout << rapid::ndarray::sum(arr) << "\n\n";
+	std::cout << rapid::ndarray::sum(arr, 0) << "\n\n";
+	std::cout << rapid::ndarray::sum(arr, 1) << "\n\n";
+	std::cout << rapid::ndarray::sum(arr, 2) << "\n\n";
 
 	return 0;
 }

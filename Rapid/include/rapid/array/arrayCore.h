@@ -654,6 +654,33 @@ namespace rapid
 				}
 			}
 
+			inline static Array<arrayType, location> fromScalar(const arrayType &val)
+			{
+				Array<arrayType, location> res;
+
+				res.isZeroDim = true;
+				res.shape = {1};
+
+				if (location == CPU)
+				{
+					res.dataStart = new arrayType[1];
+					res.dataStart[0] = val;
+				}
+			#ifdef RAPID_CUDA
+				else
+				{
+					cudaSafeCall(cudaMalloc(&res.dataStart, sizeof(arrayType)));
+					cudaSafeCall(cudaMemcpy(res.dataStart, &val, sizeof(arrayType), cudaMemcpyHostToDevice));
+				}
+			#endif
+
+				res.dataOrigin = res.dataStart;
+				res.originCount = new size_t;
+				(*res.originCount) = 1;
+
+				return res;
+			}
+
 			/// <summary>
 			/// Create an array from an existing array. The array that is created
 			/// will inherit the same data as the array it is created from, so an
@@ -3643,31 +3670,69 @@ namespace rapid
 		/// <param name="arr"></param>
 		/// <returns></returns>
 		template<typename t, ArrayLocation loc>
-		inline t sum(const Array<t, loc> &arr)
+		inline Array<t, loc> sum(const Array<t, loc> &arr, uint64_t axis = (uint64_t) -1, uint64_t depth = 0)
 		{
-			if (loc == CPU)
+			if (axis == (uint64_t) -1 || arr.shape.size() == 1)
 			{
-				t res = 0;
+				if (loc == CPU)
+				{
+					t res = 0;
 
-				for (size_t i = 0; i < math::prod(arr.shape); i++)
-					res += arr.dataStart[i];
-				return res;
+					for (size_t i = 0; i < math::prod(arr.shape); i++)
+						res += arr.dataStart[i];
+					return Array<t, loc>::fromScalar(res);
+				}
+			#ifdef RAPID_CUDA
+				else if (loc == GPU)
+				{
+					auto host = new t[math::prod(arr.shape)];
+					cudaSafeCall(cudaDeviceSynchronize());
+					cudaSafeCall(cudaMemcpy(host, arr.dataStart, sizeof(t) * math::prod(arr.shape), cudaMemcpyDeviceToHost));
+					t res = 0;
+
+					for (size_t i = 0; i < math::prod(arr.shape); i++)
+						res += host[i];
+
+					delete[] host;
+					return Array<t, loc>::fromScalar(res);
+				}
+			#endif
 			}
-		#ifdef RAPID_CUDA
-			else if (loc == GPU)
+
+			rapidAssert(axis < arr.shape.size(), "Axis '" + std::to_string(axis) +
+						"' is out of bounds for array with '" + std::to_string(arr.shape.size()) +
+						"' dimensions");
+
+			std::vector<uint64_t> transposeOrder(arr.shape.size());
+
+			if (depth == 0)
 			{
-				auto host = new t[math::prod(arr.shape)];
-				cudaSafeCall(cudaDeviceSynchronize());
-				cudaSafeCall(cudaMemcpy(host, arr.dataStart, sizeof(t) * math::prod(arr.shape), cudaMemcpyDeviceToHost));
-				t res = 0;
+				for (uint64_t i = 0; i < axis; i++)
+					transposeOrder[i] = i;
 
-				for (size_t i = 0; i < math::prod(arr.shape); i++)
-					res += host[i];
+				for (uint64_t i = axis; i < arr.shape.size() - 1; i++)
+					transposeOrder[i] = depth == 0 ? (i + 1) : i;
 
-				delete[] host;
-				return res;
+				transposeOrder[transposeOrder.size() - 1] = axis;
 			}
-		#endif
+			else
+			{
+				for (uint64_t i = 0; i < arr.shape.size(); i++)
+					transposeOrder[i] = i;
+			}
+
+			auto fixed = arr.transposed(transposeOrder);
+
+			std::vector<uint64_t> resShape;
+			for (uint64_t i = 0; i < transposeOrder.size() - 1; i++)
+				resShape.emplace_back(arr.shape[transposeOrder[i]]);
+
+			Array<t, loc> res(resShape);
+
+			for (uint64_t outer = 0; outer < res.shape[0]; outer++)
+				res[outer] = sum(fixed[outer], math::max(axis, 1) - 1, depth + 1);
+
+			return res;
 		}
 
 		template<typename t, ArrayLocation loc>
@@ -3776,7 +3841,7 @@ namespace rapid
 				{
 					return x * x;
 				});
-		}
+			}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
@@ -3785,7 +3850,7 @@ namespace rapid
 		#endif
 
 			return result;
-	}
+		}
 
 		/// <summary>
 		/// Square root every element in an array
@@ -3811,7 +3876,7 @@ namespace rapid
 				{
 					return std::sqrt(x);
 				});
-		}
+			}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
@@ -3820,7 +3885,7 @@ namespace rapid
 		#endif
 
 			return result;
-}
+		}
 
 		/// <summary>
 		/// Raise an array to a power
@@ -3846,7 +3911,7 @@ namespace rapid
 				{
 					return std::pow(x, power);
 				});
-		}
+			}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
@@ -4104,5 +4169,5 @@ namespace rapid
 
 			return res;
 		}
-		}
-		}
+	}
+}
