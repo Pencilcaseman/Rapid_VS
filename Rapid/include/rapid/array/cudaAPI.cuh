@@ -599,6 +599,19 @@ namespace rapid
 						res[i * N] = std::pow(arr[i * M], n);
 					}
 				}
+
+				template<typename src, typename dst>
+				__global__
+					void array_cast(unsigned int size, const src *arr, const unsigned int M, dst *res, const unsigned int N)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < size; i += stride)
+					{
+						res[i * N] = (dst) arr[i * M];
+					}
+				}
 			}
 
 			inline void printStuff(unsigned int size, const float *arr, int sync = 1)
@@ -1221,6 +1234,19 @@ namespace rapid
 					cudaSafeCall(cudaDeviceSynchronize());
 
 				kernel::array_pow_double << <numBlocks, blockSize >> > (size, arr, M, p, res, N);
+			}
+
+			template<typename src, typename dst>
+			inline void array_cast(unsigned int size, const src *arr, const unsigned int M, dst *res, const unsigned int N, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (size + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::array_cast << <numBlocks, blockSize >> > (size, arr, M, res, N);
 			}
 		}
 	}

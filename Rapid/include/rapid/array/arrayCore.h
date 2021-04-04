@@ -1008,7 +1008,7 @@ namespace rapid
 					rapidAssert(isZeroDim, "Cannot cast multidimensional array to scalar value");
 				if (location == CPU)
 					return (t) (dataStart[0]);
-
+			
 			#ifdef RAPID_CUDA
 				if (location == GPU)
 				{
@@ -4150,21 +4150,72 @@ namespace rapid
 		/// <typeparam name="src"></typeparam>
 		/// <param name="src"></param>
 		/// <returns></returns>
-		template<typename resT, typename srcT>
-		inline Array<resT> cast(const Array<srcT> &src)
+		template<typename resT, ArrayLocation loc = CPU, typename srcT, ArrayLocation srcL>
+		inline Array<resT, loc> cast(const Array<srcT, srcL> &src)
 		{
-			Array<resT> res(src.shape);
+			Array<resT, loc> res(src.shape);
 
-			if (math::prod(src.shape) < 10000)
+			if (loc == CPU && srcL == CPU)
 			{
-				for (int64_t i = 0; i < math::prod(src.shape); i++)
-					res.dataStart[i] = (resT) src.dataStart[i];
+				if (math::prod(src.shape) < 10000)
+				{
+					for (int64_t i = 0; i < math::prod(src.shape); i++)
+						res.dataStart[i] = (resT) src.dataStart[i];
+				}
+				else
+				{
+				#pragma omp parallel for
+					for (int64_t i = 0; i < math::prod(src.shape); i++)
+						res.dataStart[i] = (resT) src.dataStart[i];
+				}
 			}
-			else
+			else if (loc == CPU && srcL == GPU)
 			{
-			#pragma omp parallel for
-				for (int64_t i = 0; i < math::prod(src.shape); i++)
-					res.dataStart[i] = (resT) src.dataStart[i];
+				if (math::prod(src.shape) < 10000)
+				{
+					srcT srcVal = 0;
+					for (int64_t i = 0; i < math::prod(src.shape); i++)
+					{
+						cudaSafeCall(cudaMemcpy(&srcVal, src.dataStart + i, sizeof(srcT), cudaMemcpyDeviceToHost));
+						res.dataStart[i] = (resT) srcVal;
+					}
+				}
+				else
+				{
+					srcT srcVal = 0;
+				#pragma omp parallel for private(srcVal)
+					for (int64_t i = 0; i < math::prod(src.shape); i++)
+					{
+						cudaSafeCall(cudaMemcpy(&srcVal, src.dataStart + i, sizeof(srcT), cudaMemcpyDeviceToHost));
+						res.dataStart[i] = (resT) srcVal;
+					}
+				}
+			}
+			else if (loc == GPU && srcL == CPU)
+			{
+				if (math::prod(src.shape) < 10000)
+				{
+					resT srcVal = 0;
+					for (int64_t i = 0; i < math::prod(src.shape); i++)
+					{
+						srcVal = (resT) src.dataStart[i];
+						cudaSafeCall(cudaMemcpy(res.dataStart + i, &srcVal, sizeof(resT), cudaMemcpyHostToDevice));
+					}
+				}
+				else
+				{
+					resT srcVal = 0;
+				#pragma omp parallel for private(srcVal)
+					for (int64_t i = 0; i < math::prod(src.shape); i++)
+					{
+						srcVal = (resT) src.dataStart[i];
+						cudaSafeCall(cudaMemcpy(res.dataStart + i, &srcVal, sizeof(resT), cudaMemcpyHostToDevice));
+					}
+				}
+			}
+			else if (loc == GPU && srcL == CPU)
+			{
+				cuda::array_cast((unsigned int) math::prod(src.shape), src.dataStart, 1, res.dataStart, 1);
 			}
 
 			return res;

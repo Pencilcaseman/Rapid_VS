@@ -3,6 +3,7 @@
 #include "../internal.h"
 #include "../math.h"
 #include "../array.h"
+#include "defaultedTypes.h"
 
 namespace rapid
 {
@@ -10,79 +11,22 @@ namespace rapid
 	{
 		namespace optim
 		{
-			template<typename _Ty>
-			struct LearningRate
-			{
-				int initialized = 0;
-				_Ty defaultValue = 0;
-				_Ty value = 0;
-
-				inline void setValue(_Ty val)
-				{
-					initialized = 1;
-					value = val;
-				}
-
-				inline _Ty getValue() const
-				{
-					return initialized ? value : defaultValue;
-				}
-			};
-
-			template<typename _Ty>
-			struct Scalar
-			{
-				int initialized = 0;
-				_Ty defaultValue = 0;
-				_Ty value = 0;
-
-				inline void setValue(_Ty val)
-				{
-					initialized = 1;
-					value = val;
-				}
-
-				inline _Ty getValue() const
-				{
-					return initialized ? value : defaultValue;
-				}
-			};
-
-			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
-			struct NDArray
-			{
-				int initialized = 0;
-				ndarray::Array<_Ty, loc> defaultValue;
-				ndarray::Array<_Ty, loc> value;
-
-				inline void setValue(const ndarray::Array<_Ty, loc> &val)
-				{
-					initialized = 1;
-					value.set(val.copy());
-				}
-
-				inline ndarray::Array<_Ty, loc> getValue() const
-				{
-					return initialized ? value : defaultValue;
-				}
-			};
-
 			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>
 			struct Config
 			{
 				int initialized = 0;               // Is the context initialized
 
-				LearningRate<_Ty> learningRate;    // Scalar learning rate
-				Scalar<_Ty> momentum;              // Scalar between 0 and 1 representing momentum value
-				NDArray<_Ty, loc> velocity;        // ndarray::Array of same shape as w storing a moving average of gradients
-				Scalar<_Ty> decayRate;             // Scalar between 0 and 1 storing the decay rate for the squared gradient cache
-				Scalar<_Ty> epsilon;               // Small scalar used for smoothing to avoid division by zero
-				NDArray<_Ty, loc> cache;           // Moving average of second moments of gradients
-				Scalar<_Ty> beta1;                 // Decay rate for moving average of first moment gradient
-				Scalar<_Ty> beta2;                 // Decay rate for moving average of second moment gradient
-				NDArray<_Ty, loc> m;               // Moving average of gradient
-				NDArray<_Ty, loc> v;               // Moving average of squared gradient
-				uint64_t t = 0;                    // Iteration number
+				defaults::Scalar<_Ty> learningRate;          // Scalar learning rate
+				defaults::Scalar<_Ty> momentum;              // Scalar between 0 and 1 representing momentum value
+				defaults::NDArray<_Ty, loc> velocity;        // ndarray::Array of same shape as w storing a moving average of gradients
+				defaults::Scalar<_Ty> decayRate;             // Scalar between 0 and 1 storing the decay rate for the squared gradient cache
+				defaults::Scalar<_Ty> epsilon;               // Small scalar used for smoothing to avoid division by zero
+				defaults::NDArray<_Ty, loc> cache;           // Moving average of second moments of gradients
+				defaults::Scalar<_Ty> beta1;                 // Decay rate for moving average of first moment gradient
+				defaults::Scalar<_Ty> beta2;                 // Decay rate for moving average of second moment gradient
+				defaults::NDArray<_Ty, loc> m;               // Moving average of gradient
+				defaults::NDArray<_Ty, loc> v;               // Moving average of squared gradient
+				uint64_t t = 0;                              // Iteration number
 			};
 
 			template<typename _Ty, ndarray::ArrayLocation loc = ndarray::CPU>

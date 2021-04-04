@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../array.h"
+#include "defaultedTypes.h"
 
 namespace rapid
 {
@@ -55,7 +56,7 @@ namespace rapid
 			Cache<t, loc> delta;
 		};
 
-		
+
 		template<typename t, ndarray::ArrayLocation loc>
 		struct ReluOutput
 		{
@@ -70,17 +71,17 @@ namespace rapid
 		};
 
 		template<typename t, ndarray::ArrayLocation loc>
-		struct BatchNormParam
+		struct BatchnormParam
 		{
-			int mode;
-			t eps;
-			t momentum;
-			ndarray::Array<t, loc> runningMean;
-			ndarray::Array<t, loc> runningVariance;
+			std::string mode;
+			defaults::Scalar<t> eps{0, 1e-15, 0};
+			defaults::Scalar<t> momentum{0, 0.9, 0};
+			defaults::NDArray<t, loc> runningMean;
+			defaults::NDArray<t, loc> runningVariance;
 		};
 
 		template<typename t, ndarray::ArrayLocation loc>
-		struct BatchNormCache
+		struct BatchnormCache
 		{
 			ndarray::Array<t, loc> xNorm;
 			t gamma;
@@ -89,6 +90,13 @@ namespace rapid
 			ndarray::Array<t, loc> sample_variance;
 			ndarray::Array<t, loc> x;
 			t eps;
+		};
+
+		template<typename t, ndarray::ArrayLocation loc>
+		struct BatchnormOutput
+		{
+			ndarray::Array<t, loc> out;
+			BatchnormCache<t, loc> cache;
 		};
 
 		/// <summary>
@@ -113,16 +121,9 @@ namespace rapid
 		template<typename t, ndarray::ArrayLocation loc>
 		inline AffineBackwardOutput<t, loc> affineBackward(const ndarray::Array<t, loc> &dOut, const Cache<t, loc> &cache)
 		{
-			std::cout << "Information\n";
-			std::cout << cache.x << "\n\n";
-
 			const auto &shapes = cache.x.shape;
 			const auto N = shapes[0];
 			auto z = cache.x.reshaped({N, AUTO});
-
-			std::cout << "More information\n";
-			std::cout << dOut << "\n\n";
-			std::cout << cache.w << "\n\n";
 
 			auto dx = dOut.dot(cache.w.transposed()).reshaped(shapes);
 			auto dw = (z.transposed()).dot(dOut);
@@ -143,6 +144,77 @@ namespace rapid
 		{
 			auto dx = ndarray::greater(cache, 0) * dOut;
 			return {dx};
+		}
+
+		/*
+		Forward pass for batch normalization.
+
+		During training the sample mean and (uncorrected) sample variance are
+		computed from minibatch statistics and used to normalize the incoming data.
+		During training we also keep an exponentially decaying running mean of the mean
+		and variance of each feature, and these averages are used to normalize data
+		at test-time.
+
+		At each timestep we update the running averages for mean and variance using
+		an exponential decay based on the momentum parameter:
+
+		running_mean = momentum * running_mean + (1 - momentum) * sample_mean
+		running_var = momentum * running_var + (1 - momentum) * sample_var
+
+		Note that the batch normalization paper suggests a different test-time
+		behavior: they compute sample mean and variance for each feature using a
+		large number of training images rather than using a running average. For
+		this implementation we have chosen to use running averages instead since
+		they do not require an additional estimation step; the torch7 implementation
+		of batch normalization also uses running averages.
+
+		Input:
+		- x: Data of shape (N, D)
+		- gamma: Scale parameter of shape (D,)
+		- beta: Shift parameter of shape (D,)
+		- bn_param: Dictionary with the following keys:
+		  - mode: 'train' or 'test'; required
+		  - eps: Constant for numeric stability
+		  - momentum: Constant for running mean / variance.
+		  - running_mean: Array of shape (D,) giving running mean of features
+		  - running_var Array of shape (D,) giving running variance of features
+
+		Returns a tuple of:
+		- out: of shape (N, D)
+		- cache: A tuple of values needed in the backward pass
+		*/
+		template<typename t, ndarray::ArrayLocation loc>
+		inline BatchnormOutput<t, loc> batchnormForward(const ndarray::Array<t, loc> &x, const ndarray::Array<t, loc> &gamma,
+														const ndarray::Array<t, loc> &beta, const BatchnormParam<t, loc> &batchnormParam)
+		{
+			auto &mode = batchnormParam.mode;
+			auto eps = batchnormParam.eps.getValue();
+			auto momentum = batchnormParam.momentum.getValue();
+
+			auto D = x.shape[1];
+
+			ndarray::Array<t, loc> runningMean;
+			if (batchnormParam.runningMean.initialized)
+				runningMean = batchnormParam.runningMean.getValue();
+			else
+				runningMean = ndarray::zeros<t, loc>({D});
+
+			ndarray::Array<t, loc> runningVariance;
+			if (batchnormParam.runningVariance.initialized)
+				runningVariance = batchnormParam.runningVariance.getValue();
+			else
+				runningVariance = ndarray::zeros<t, loc>({D});
+
+			if (mode == "train")
+			{
+				auto sampleMean = ndarray::mean(x, 0);
+				auto sample_var = ndarray::var(x, 0);
+				auto x_norm = (x - sampleMean) / ndarray::sqrt(sample_var + eps);
+				auto out = gamma * x_norm + beta;
+				auto cache = (x_norm, gamma, beta, sample_mean, sample_var, x, eps);
+				auto running_mean = momentum * running_mean + (1 - momentum) * sample_mean;
+				auto running_var = momentum * running_var + (1 - momentum) * sample_var;
+			}
 		}
 	}
 }

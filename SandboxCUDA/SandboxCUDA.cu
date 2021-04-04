@@ -16,33 +16,24 @@ int main()
 	using networkType = float;
 	const rapid::ndarray::ArrayLocation networkLocation = CPU;
 
-	// auto x = rapid::ndarray::Array<networkType, networkLocation>({5, 3, 3, 3});
-	// auto w = rapid::ndarray::Array<networkType, networkLocation>({3 * 3 * 3, 5});
-	// auto b = rapid::ndarray::Array<networkType, networkLocation>({5});
-	// 
-	// x.fill(0.5);
-	// w.fill(-0.5);
-	// b.fill(0.75);
-	// 
-	// auto res = rapid::network::affineForward(x, w, b);
-	// 
-	// auto dOut = rapid::ndarray::zerosLike(res.out);
-	// 
-	// auto backwardRes = rapid::network::affineBackward(dOut, res.cache);
-	// 
-	// std::cout << backwardRes.delta.x << "\n\n";
-	// std::cout << backwardRes.delta.w << "\n\n";
-	// std::cout << backwardRes.delta.b << "\n\n";
+	auto x = rapid::ndarray::Array<networkType, networkLocation>({5, 3, 3, 3});
+	auto w = rapid::ndarray::Array<networkType, networkLocation>({3 * 3 * 3, 5});
+	auto b = rapid::ndarray::Array<networkType, networkLocation>({5});
 
-	/************************************************************************/
-	/* This part nearly works. Fix the transpose mechanism.                 */
-	/************************************************************************/
-	auto arr = rapid::ndarray::arange(1.f, 25.f).reshaped({2, 3, 4});
-	std::cout << arr << "\n\n";
-	std::cout << rapid::ndarray::sum(arr) << "\n\n";
-	std::cout << rapid::ndarray::sum(arr, 0) << "\n\n";
-	std::cout << rapid::ndarray::sum(arr, 1) << "\n\n";
-	std::cout << rapid::ndarray::sum(arr, 2) << "\n\n";
+	x.fill(0.5);
+	w.fill(-0.5);
+	b.fill(0.75);
+
+	auto res = rapid::network::affineForward(x, w, b);
+
+	auto dOut = rapid::ndarray::zerosLike(res.out);
+	dOut.fill(0.2);
+
+	auto backwardRes = rapid::network::affineBackward(dOut, res.cache);
+
+	std::cout << backwardRes.delta.x << "\n\n";
+	std::cout << backwardRes.delta.w << "\n\n";
+	std::cout << backwardRes.delta.b << "\n\n";
 
 	return 0;
 }

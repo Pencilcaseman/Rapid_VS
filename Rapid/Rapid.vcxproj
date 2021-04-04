@@ -260,6 +260,7 @@
     <ClInclude Include="include\rapid\IO\createDir.h" />
     <ClInclude Include="include\rapid\IO\systemExecute.h" />
     <ClInclude Include="include\rapid\math.h" />
+    <ClInclude Include="include\rapid\network\defaultedTypes.h" />
     <ClInclude Include="include\rapid\network\layers.h" />
     <ClInclude Include="include\rapid\network\optimizers.h" />
     <ClInclude Include="include\rapid\parser.h" />
