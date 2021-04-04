@@ -612,6 +612,19 @@ namespace rapid
 						res[i * N] = (dst) arr[i * M];
 					}
 				}
+
+				template<typename t>
+				__global__
+					void array_abs(unsigned int size, const t *arr, const unsigned int M, t *res, const unsigned int N)
+				{
+					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
+					unsigned int stride = blockDim.x * gridDim.x;
+
+					for (unsigned int i = index; i < size; i += stride)
+					{
+						res[i * N] = std::abs(arr[i * M]);
+					}
+				}
 			}
 
 			inline void printStuff(unsigned int size, const float *arr, int sync = 1)
@@ -1247,6 +1260,19 @@ namespace rapid
 					cudaSafeCall(cudaDeviceSynchronize());
 
 				kernel::array_cast << <numBlocks, blockSize >> > (size, arr, M, res, N);
+			}
+
+			template<typename t>
+			inline void array_abs(unsigned int size, const t *arr, const unsigned int M, t *res, const unsigned int N, int sync = 1)
+			{
+				// Perform calculation
+				unsigned int blockSize = BLOCK_SIZE;
+				unsigned int numBlocks = (size + blockSize - 1) / blockSize;
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+				
+				kernel::array_abs << <numBlocks, blockSize >> > (size, arr, M, res, N);
 			}
 		}
 	}

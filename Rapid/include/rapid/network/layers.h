@@ -205,16 +205,16 @@ namespace rapid
 			else
 				runningVariance = ndarray::zeros<t, loc>({D});
 
-			if (mode == "train")
-			{
-				auto sampleMean = ndarray::mean(x, 0);
-				auto sample_var = ndarray::var(x, 0);
-				auto x_norm = (x - sampleMean) / ndarray::sqrt(sample_var + eps);
-				auto out = gamma * x_norm + beta;
-				auto cache = (x_norm, gamma, beta, sample_mean, sample_var, x, eps);
-				auto running_mean = momentum * running_mean + (1 - momentum) * sample_mean;
-				auto running_var = momentum * running_var + (1 - momentum) * sample_var;
-			}
+			// if (mode == "train")
+			// {
+			// 	auto sampleMean = ndarray::mean(x, 0);
+			// 	auto sample_var = ndarray::var(x, 0);
+			// 	auto x_norm = (x - sampleMean) / ndarray::sqrt(sample_var + eps);
+			// 	auto out = gamma * x_norm + beta;
+			// 	auto cache = (x_norm, gamma, beta, sample_mean, sample_var, x, eps);
+			// 	auto running_mean = momentum * running_mean + (1 - momentum) * sample_mean;
+			// 	auto running_var = momentum * running_var + (1 - momentum) * sample_var;
+			// }
 		}
 	}
 }

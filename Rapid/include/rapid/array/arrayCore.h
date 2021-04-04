@@ -475,7 +475,7 @@ namespace rapid
 				shape = newShape;
 			}
 
-			int calculateArithmeticMode(const std::vector<uint64_t> &a, const std::vector<uint64_t> &b) const
+			static int calculateArithmeticMode(const std::vector<uint64_t> &a, const std::vector<uint64_t> &b)
 			{
 				// Check for direct or indirect shape match
 				int mode = -1; // Addition mode
@@ -1008,7 +1008,7 @@ namespace rapid
 					rapidAssert(isZeroDim, "Cannot cast multidimensional array to scalar value");
 				if (location == CPU)
 					return (t) (dataStart[0]);
-			
+
 			#ifdef RAPID_CUDA
 				if (location == GPU)
 				{
@@ -1781,7 +1781,6 @@ namespace rapid
 						}
 				}
 			}
-
 
 			/// <summary>
 			/// Array div Array
@@ -3741,9 +3740,7 @@ namespace rapid
 			// Mean of all values
 			if (axis == (uint64_t) -1 || arr.shape.size() == 1)
 			{
-				Array<t, loc> res({0});
-				res.dataStart[0] = sum(arr) / math::prod(arr.shape);
-				return res;
+				return Array<t, loc>(sum(arr) / math::prod(arr.shape));
 			}
 
 			rapidAssert(axis < arr.shape.size(), "Axis '" + std::to_string(axis) +
@@ -3782,6 +3779,34 @@ namespace rapid
 			return res;
 		}
 
+		template<typename t, ArrayLocation loc>
+		inline Array<t, loc> abs(const Array<t, loc> &arr)
+		{
+			Array<t, loc> result(arr.shape);
+
+			if (loc == CPU)
+			{
+				ExecutionType mode;
+				if (math::prod(arr.shape) > 10000)
+					mode = ExecutionType::PARALLEL;
+				else
+					mode = ExecutionType::SERIAL;
+
+				Array<t, loc>::unaryOpArray(arr, result, mode, [](t x)
+				{
+					return std::abs(x);
+				});
+			}
+		#ifdef RAPID_CUDA
+			else if (loc == GPU)
+			{
+				cuda::array_abs(math::prod(arr.shape), arr.dataStart, 1, result.dataStart, 1);
+			}
+		#endif
+
+			return result;
+		}
+
 		/// <summary>
 		/// Calculate the exponent of every value
 		/// in an array, and return the result
@@ -3810,7 +3835,7 @@ namespace rapid
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
-				cuda::array_exp(math::prod(arr.shape), arr.dataStart, result.dataStart);
+				cuda::array_exp(math::prod(arr.shape), arr.dataStart, 1, result.dataStart, 1);
 			}
 		#endif
 
@@ -3894,8 +3919,8 @@ namespace rapid
 		/// <param name="arr"></param>
 		/// <param name="power"></param>
 		/// <returns></returns>
-		template<typename t, ArrayLocation loc>
-		inline Array<t, loc> pow(const Array<t, loc> &arr, t power)
+		template<typename t, typename p, ArrayLocation loc>
+		inline Array<t, loc> pow(const Array<t, loc> &arr, p power)
 		{
 			Array<t, loc> result(arr.shape);
 
@@ -3909,17 +3934,37 @@ namespace rapid
 
 				Array<t, loc>::unaryOpArray(arr, result, mode, [=](t x)
 				{
-					return std::pow(x, power);
+					return std::pow(x, (t) power);
 				});
 			}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
-				cuda::array_pow(math::prod(arr.shape), arr.dataStart, power, result.dataStart);
+				cuda::array_pow(math::prod(arr.shape), arr.dataStart, 1, (t) power, result.dataStart, 1);
 			}
 		#endif
 
 			return result;
+		}
+
+		template<typename t, ArrayLocation loc>
+		inline Array<t, loc> var(const Array<t, loc> &arr, const uint64_t axis = (uint64_t) -1)
+		{
+			std::vector<uint64_t> reshapeVector(arr.shape.size());
+			auto meanArr = mean(arr, axis);
+
+			auto mode = Array<t, loc>::calculateArithmeticMode(arr.shape, meanArr.shape);
+
+			if (mode == -1)
+			{
+				reshapeVector[reshapeVector.size() - 1] = 1;
+
+				for (uint64_t i = 0; i < meanArr.shape.size(); i++)
+					reshapeVector[i] = meanArr.shape[i];
+				meanArr.reshape(reshapeVector);
+			}
+
+			return mean(pow(abs(arr - meanArr), (t) 2), axis);
 		}
 
 		template<typename t, ArrayLocation loc>
