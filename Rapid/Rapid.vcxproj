@@ -185,7 +185,6 @@
     <ClInclude Include="include\rapid\array.h" />
     <ClInclude Include="include\rapid\array\arrayCore.h" />
     <ClInclude Include="include\rapid\array\cblasAPI.h" />
-    <ClInclude Include="include\rapid\array\cudaAPI.cuh" />
     <ClInclude Include="include\rapid\array\fromData.h" />
     <ClInclude Include="include\rapid\array\prettyPrint.h" />
     <ClInclude Include="include\rapid\graphics.h" />
@@ -279,6 +278,7 @@
     <ClInclude Include="include\rapid\vector\vec2.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="include\rapid\array\cudaAPI.cuh" />
     <None Include="include\rapid\graphics\glew\doc\advanced.html" />
     <None Include="include\rapid\graphics\glew\doc\basic.html" />
     <None Include="include\rapid\graphics\glew\doc\build.html" />

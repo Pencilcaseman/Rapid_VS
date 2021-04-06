@@ -34,41 +34,6 @@ namespace rapid
 
 		namespace utils
 		{
-			struct strContainer
-			{
-				std::string str;
-				size_t decimalPoint;
-			};
-
-			/// <summary>
-			/// Format a numerical value and return it as a string
-			/// </summary>
-			/// <typeparam name="t"></typeparam>
-			/// <param name="val"></param>
-			/// <returns></returns>
-			template<typename t>
-			strContainer formatNumerical(const t &val)
-			{
-				std::stringstream stream;
-				stream << val;
-
-				auto lastDecimal = stream.str().find_last_of('.');
-
-				if (std::is_floating_point<t>::value && lastDecimal == std::string::npos)
-				{
-					stream << ".";
-					lastDecimal = stream.str().length() - 1;
-				}
-
-				auto lastZero = stream.str().find_last_of('0');
-
-				// Value is integral
-				if (lastDecimal == std::string::npos)
-					return {stream.str(), stream.str().length() - 1};
-
-				return {stream.str(), lastDecimal};
-			}
-
 			/// <summary>
 			/// Convert an index and a given array shape and return the memory
 			/// offset for the given position in contiguous memory
@@ -1191,6 +1156,7 @@ namespace rapid
 									return x + y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1200,6 +1166,8 @@ namespace rapid
 								auto res = Array<arrayType, location>(shape);
 
 								cuda::add_array_array((unsigned int) math::prod(shape), dataStart, 1, other.dataStart, 1, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1220,6 +1188,7 @@ namespace rapid
 									return x + y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1233,6 +1202,8 @@ namespace rapid
 								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
 								cuda::add_array_scalar((unsigned int) math::prod(shape), dataStart, 1, val, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1253,6 +1224,7 @@ namespace rapid
 									return x + y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1265,6 +1237,8 @@ namespace rapid
 								cudaSafeCall(cudaDeviceSynchronize());
 								cudaSafeCall(cudaMemcpy(&val, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 								cuda::add_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1279,6 +1253,7 @@ namespace rapid
 							for (uint64_t i = 0; i < shape[0]; i++)
 								res[i] = (*this)[i] + other;
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 4:
@@ -1291,6 +1266,7 @@ namespace rapid
 							for (uint64_t i = 0; i < other.shape[0]; i++)
 								res[i] = (*this) + other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 5:
@@ -1308,6 +1284,7 @@ namespace rapid
 							for (uint64_t i = 0; i < resShape[0]; i++)
 								res[i] = (*this)[i] + other;
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 6:
@@ -1325,6 +1302,7 @@ namespace rapid
 							for (uint64_t i = 0; i < resShape[0]; i++)
 								res[i] = (*this) + other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 7:
@@ -1337,6 +1315,7 @@ namespace rapid
 							for (uint64_t i = 0; i < res.shape[0]; i++)
 								res[i] = (*this)[i] + other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 8:
@@ -1349,6 +1328,7 @@ namespace rapid
 							for (uint64_t i = 0; i < res.shape[0]; i++)
 								res[i] = (*this)[i] + other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					default:
@@ -1412,6 +1392,8 @@ namespace rapid
 								auto res = Array<arrayType, location>(shape);
 
 								cuda::sub_array_array((unsigned int) math::prod(shape), dataStart, 1, other.dataStart, 1, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1432,6 +1414,7 @@ namespace rapid
 									return x - y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1445,6 +1428,8 @@ namespace rapid
 								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
 								cuda::sub_array_scalar((unsigned int) math::prod(shape), dataStart, 1, val, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1465,6 +1450,7 @@ namespace rapid
 									return x - y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1477,6 +1463,8 @@ namespace rapid
 								cudaSafeCall(cudaDeviceSynchronize());
 								cudaSafeCall(cudaMemcpy(&val, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 								cuda::sub_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1491,6 +1479,7 @@ namespace rapid
 							for (uint64_t i = 0; i < shape[0]; i++)
 								res[i] = (*this)[i] - other;
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 4:
@@ -1503,6 +1492,7 @@ namespace rapid
 							for (uint64_t i = 0; i < other.shape[0]; i++)
 								res[i] = (*this) - other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 5:
@@ -1520,6 +1510,7 @@ namespace rapid
 							for (uint64_t i = 0; i < resShape[0]; i++)
 								res[i] = (*this)[i] - other;
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 6:
@@ -1537,6 +1528,7 @@ namespace rapid
 							for (uint64_t i = 0; i < resShape[0]; i++)
 								res[i] = (*this) - other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 7:
@@ -1549,6 +1541,7 @@ namespace rapid
 							for (uint64_t i = 0; i < res.shape[0]; i++)
 								res[i] = (*this)[i] - other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 8:
@@ -1561,6 +1554,7 @@ namespace rapid
 							for (uint64_t i = 0; i < res.shape[0]; i++)
 								res[i] = (*this)[i] - other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					default:
@@ -1615,6 +1609,7 @@ namespace rapid
 									return x * y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1624,6 +1619,8 @@ namespace rapid
 								auto res = Array<arrayType, location>(shape);
 
 								cuda::mul_array_array((unsigned int) math::prod(shape), dataStart, 1, other.dataStart, 1, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1644,6 +1641,7 @@ namespace rapid
 									return x * y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1657,6 +1655,8 @@ namespace rapid
 								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
 								cuda::mul_array_scalar((unsigned int) math::prod(shape), dataStart, 1, val, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1677,6 +1677,7 @@ namespace rapid
 									return x * y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1689,6 +1690,8 @@ namespace rapid
 								cudaSafeCall(cudaDeviceSynchronize());
 								cudaSafeCall(cudaMemcpy(&val, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 								cuda::mul_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1703,6 +1706,7 @@ namespace rapid
 							for (uint64_t i = 0; i < shape[0]; i++)
 								res[i] = (*this)[i] * other;
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 4:
@@ -1715,6 +1719,7 @@ namespace rapid
 							for (uint64_t i = 0; i < other.shape[0]; i++)
 								res[i] = (*this) * other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 5:
@@ -1732,6 +1737,7 @@ namespace rapid
 							for (uint64_t i = 0; i < resShape[0]; i++)
 								res[i] = (*this)[i] * other;
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 6:
@@ -1749,6 +1755,7 @@ namespace rapid
 							for (uint64_t i = 0; i < resShape[0]; i++)
 								res[i] = (*this) * other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 7:
@@ -1761,6 +1768,7 @@ namespace rapid
 							for (uint64_t i = 0; i < res.shape[0]; i++)
 								res[i] = (*this)[i] * other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 8:
@@ -1773,6 +1781,7 @@ namespace rapid
 							for (uint64_t i = 0; i < res.shape[0]; i++)
 								res[i] = (*this)[i] * other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					default:
@@ -1827,6 +1836,7 @@ namespace rapid
 									return x / y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1836,6 +1846,8 @@ namespace rapid
 								auto res = Array<arrayType, location>(shape);
 
 								cuda::div_array_array((unsigned int) math::prod(shape), dataStart, 1, other.dataStart, 1, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1856,6 +1868,7 @@ namespace rapid
 									return x / y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1869,6 +1882,8 @@ namespace rapid
 								cudaSafeCall(cudaMemcpy(&val, other.dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 
 								cuda::div_array_scalar((unsigned int) math::prod(shape), dataStart, 1, val, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1889,6 +1904,7 @@ namespace rapid
 									return x / y;
 								});
 
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 
@@ -1901,6 +1917,8 @@ namespace rapid
 								cudaSafeCall(cudaDeviceSynchronize());
 								cudaSafeCall(cudaMemcpy(&val, dataStart, sizeof(arrayType), cudaMemcpyDeviceToHost));
 								cuda::div_scalar_array((unsigned int) math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
+
+								res.isZeroDim = isZeroDim && other.isZeroDim;
 								return res;
 							}
 						#endif
@@ -1915,6 +1933,7 @@ namespace rapid
 							for (uint64_t i = 0; i < shape[0]; i++)
 								res[i] = (*this)[i] / other;
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 4:
@@ -1927,6 +1946,7 @@ namespace rapid
 							for (uint64_t i = 0; i < other.shape[0]; i++)
 								res[i] = (*this) / other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 5:
@@ -1944,6 +1964,7 @@ namespace rapid
 							for (uint64_t i = 0; i < resShape[0]; i++)
 								res[i] = (*this)[i] / other;
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 6:
@@ -1961,6 +1982,7 @@ namespace rapid
 							for (uint64_t i = 0; i < resShape[0]; i++)
 								res[i] = (*this) / other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 7:
@@ -1973,6 +1995,7 @@ namespace rapid
 							for (uint64_t i = 0; i < res.shape[0]; i++)
 								res[i] = (*this)[i] / other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					case 8:
@@ -1985,6 +2008,7 @@ namespace rapid
 							for (uint64_t i = 0; i < res.shape[0]; i++)
 								res[i] = (*this)[i] / other[i];
 
+							res.isZeroDim = isZeroDim && other.isZeroDim;
 							return res;
 						}
 					default:
@@ -2012,6 +2036,8 @@ namespace rapid
 					{
 						return x + y;
 					});
+
+					res.isZeroDim = isZeroDim;
 					return res;
 				}
 
@@ -2019,6 +2045,8 @@ namespace rapid
 				auto res = Array<arrayType, location>(shape);
 
 				cuda::add_array_scalar((unsigned int) math::prod(shape), dataStart, 1, (arrayType) other, res.dataStart, 1);
+
+				res.isZeroDim = isZeroDim;
 				return res;
 			#endif
 			}
@@ -2041,12 +2069,16 @@ namespace rapid
 					{
 						return x - y;
 					});
+
+					res.isZeroDim = isZeroDim;
 					return res;
 				}
 
 			#ifdef RAPID_CUDA
 				auto res = Array<arrayType, location>(shape);
 				cuda::sub_array_scalar((unsigned int) math::prod(shape), dataStart, 1, (arrayType) other, res.dataStart, 1);
+
+				res.isZeroDim = isZeroDim;
 				return res;
 			#endif
 			}
@@ -2069,12 +2101,16 @@ namespace rapid
 					{
 						return x * y;
 					});
+
+					res.isZeroDim = isZeroDim;
 					return res;
 				}
 
 			#ifdef RAPID_CUDA
 				auto res = Array<arrayType, location>(shape);
 				cuda::mul_array_scalar(math::prod(shape), dataStart, 1, (arrayType) other, res.dataStart, 1);
+
+				res.isZeroDim = isZeroDim;
 				return res;
 			#endif
 			}
@@ -2097,12 +2133,16 @@ namespace rapid
 					{
 						return x / y;
 					});
+
+					res.isZeroDim = isZeroDim;
 					return res;
 				}
 
 			#ifdef RAPID_CUDA
 				auto res = Array<arrayType, location>(shape);
 				cuda::div_array_scalar(math::prod(shape), dataStart, 1, (arrayType) other, res.dataStart, 1);
+
+				res.isZeroDim = isZeroDim;
 				return res;
 			#endif
 			}
@@ -3161,21 +3201,21 @@ namespace rapid
 			#ifdef RAPID_CUDA
 				else if (location == GPU)
 				{
-					if (shape.size() == 1)
+					if (shape.size() == 1 || (axes.size() == 1 && axes[0] == 0))
 					{
 						auto res = Array<arrayType, location>(newDims);
 						cudaSafeCall(cudaMemcpy(res.dataStart, dataStart, sizeof(arrayType) * math::prod(newDims), cudaMemcpyDeviceToDevice));
 						return res;
 					}
-					else if (shape.size() == 2)
+					else if (shape.size() == 2 && shape != newDims)
 					{
-						uint64_t m = shape[1];
-						uint64_t n = shape[0];
+						uint64_t m = shape[0];
+						uint64_t n = shape[1];
 
 						auto res = Array<arrayType, location>(newDims);
 
-						arrayType alpha = 1;
-						arrayType beta = 0;
+						static arrayType alpha = 1;
+						static arrayType beta = 0;
 
 						cuda::geam(handle::handle,
 								   CUBLAS_OP_T, CUBLAS_OP_T,
@@ -3463,26 +3503,29 @@ namespace rapid
 		template<typename t, ArrayLocation loc>
 		inline Array<t, loc> operator+(t val, const Array<t, loc> &other)
 		{
-			auto res = Array<t, loc>(other.shape);
-
 			if (loc == CPU)
 			{
+				auto res = Array<t, loc>(other.shape);
 				Array<t, loc>::binaryOpScalarArray(val, other, res,
 												   math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 												   [](t x, t y)
 				{
 					return x + y;
 				});
+
+				res.isZeroDim = other.isZeroDim;
+				return res;
 			}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
 				auto res = Array<t, loc>(other.shape);
 				cuda::add_scalar_array(math::prod(other.shape), val, other.dataStart, res.dataStart);
+
+				res.isZeroDim = other.isZeroDim;
 				return res;
 			}
 		#endif
-			return res;
 		}
 
 		/// <summary>
@@ -3495,27 +3538,29 @@ namespace rapid
 		template<typename t, ArrayLocation loc>
 		inline Array<t, loc> operator-(t val, const Array<t, loc> &other)
 		{
-			auto res = Array<t, loc>(other.shape);
-
 			if (loc == CPU)
 			{
+				auto res = Array<t, loc>(other.shape);
 				Array<t, loc>::binaryOpScalarArray(val, other, res,
 												   math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 												   [](t x, t y)
 				{
 					return x - y;
 				});
+
+				res.isZeroDim = other.isZeroDim;
+				return res;
 			}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
 				auto res = Array<t, loc>(other.shape);
 				cuda::sub_scalar_array(math::prod(other.shape), val, other.dataStart, res.dataStart);
+
+				res.isZeroDim = other.isZeroDim;
 				return res;
 			}
 		#endif
-
-			return res;
 		}
 
 		/// <summary>
@@ -3528,26 +3573,29 @@ namespace rapid
 		template<typename t, ArrayLocation loc>
 		inline Array<t, loc> operator*(t val, const Array<t, loc> &other)
 		{
-			auto res = Array<t, loc>(other.shape);
-
 			if (loc == CPU)
 			{
+				auto res = Array<t, loc>(other.shape);
 				Array<t, loc>::binaryOpScalarArray(val, other, res,
 												   math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 												   [](t x, t y)
 				{
 					return x * y;
 				});
+
+				res.isZeroDim = other.isZeroDim;
+				return res;
 			}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
 				auto res = Array<t, loc>(other.shape);
 				cuda::mul_scalar_array(math::prod(other.shape), val, other.dataStart, 1, res.dataStart, 1);
+
+				res.isZeroDim = other.isZeroDim;
 				return res;
 			}
 		#endif
-			return res;
 		}
 
 		/// <summary>
@@ -3560,16 +3608,18 @@ namespace rapid
 		template<typename t, ArrayLocation loc>
 		inline Array<t, loc> operator/(t val, const Array<t, loc> &other)
 		{
-			auto res = Array<t, loc>(other.shape);
-
 			if (loc == CPU)
 			{
+				auto res = Array<t, loc>(other.shape);
 				Array<t, loc>::binaryOpScalarArray(val, other, res,
 												   math::prod(other.shape) > 10000 ? ExecutionType::PARALLEL : ExecutionType::SERIAL,
 												   [](t x, t y)
 				{
 					return x / y;
 				});
+
+				res.isZeroDim = other.isZeroDim;
+				return res;
 			}
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
@@ -3579,7 +3629,6 @@ namespace rapid
 				return res;
 			}
 		#endif
-			return res;
 		}
 
 		template<typename t, ArrayLocation loc>
@@ -3948,23 +3997,46 @@ namespace rapid
 		}
 
 		template<typename t, ArrayLocation loc>
-		inline Array<t, loc> var(const Array<t, loc> &arr, const uint64_t axis = (uint64_t) -1)
+		inline Array<t, loc> var(const Array<t, loc> &arr, const uint64_t axis = (uint64_t) -1, const uint64_t depth = 0)
 		{
-			std::vector<uint64_t> reshapeVector(arr.shape.size());
-			auto meanArr = mean(arr, axis);
+			// Default variation calculation on flattened array
+			if (axis == (uint64_t) -1 || arr.shape.size() == 1)
+				return mean(pow(abs(arr - mean(arr)), (t) 2));
 
-			auto mode = Array<t, loc>::calculateArithmeticMode(arr.shape, meanArr.shape);
+			rapidAssert(axis < arr.shape.size(), "Axis '" + std::to_string(axis) +
+						"' is out of bounds for array with '" + std::to_string(arr.shape.size()) +
+						"' dimensions");
 
-			if (mode == -1)
+			std::vector<uint64_t> transposeOrder(arr.shape.size());
+
+			if (depth == 0)
 			{
-				reshapeVector[reshapeVector.size() - 1] = 1;
+				for (uint64_t i = 0; i < axis; i++)
+					transposeOrder[i] = i;
 
-				for (uint64_t i = 0; i < meanArr.shape.size(); i++)
-					reshapeVector[i] = meanArr.shape[i];
-				meanArr.reshape(reshapeVector);
+				for (uint64_t i = axis; i < arr.shape.size() - 1; i++)
+					transposeOrder[i] = depth == 0 ? (i + 1) : i;
+
+				transposeOrder[transposeOrder.size() - 1] = axis;
+			}
+			else
+			{
+				for (uint64_t i = 0; i < arr.shape.size(); i++)
+					transposeOrder[i] = i;
 			}
 
-			return mean(pow(abs(arr - meanArr), (t) 2), axis);
+			auto fixed = arr.transposed(transposeOrder);
+
+			std::vector<uint64_t> resShape;
+			for (uint64_t i = 0; i < transposeOrder.size() - 1; i++)
+				resShape.emplace_back(arr.shape[transposeOrder[i]]);
+
+			Array<t, loc> res(resShape);
+
+			for (uint64_t outer = 0; outer < res.shape[0]; outer++)
+				res[outer] = var(fixed[outer], math::max(axis, 1) - 1, depth + 1);
+
+			return res;
 		}
 
 		template<typename t, ArrayLocation loc>
@@ -4094,12 +4166,12 @@ namespace rapid
 		/// <param name="end"></param>
 		/// <param name="inc"></param>
 		/// <returns></returns>
-		template<ArrayLocation loc = CPU, typename s, typename e>
-		inline Array<typename std::common_type<s, e>::type, loc> arange(s start, e end, typename std::common_type<s, e>::type inc = 1)
+		template<ArrayLocation loc = CPU, typename s, typename e, typename iT = s>
+		inline Array<typename std::common_type<s, e>::type, loc> arange(s start, e end, iT inc = 1)
 		{
 			using ct = typename std::common_type<s, e>::type;
 
-			auto len = (uint64_t) ceil(abs((ct) end - (ct) start) / (ct) inc);
+			auto len = (uint64_t) ceil(math::abs((ct) end - (ct) start) / (ct) inc);
 			auto res = Array<typename std::common_type<s, e>::type, loc>({len});
 			for (uint64_t i = 0; i < len; i++)
 				res[i] = (ct) start + (ct) inc * (ct) i;

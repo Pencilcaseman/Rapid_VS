@@ -35,12 +35,12 @@ int main()
 	// std::cout << backwardRes.delta.w << "\n\n";
 	// std::cout << backwardRes.delta.b << "\n\n";
 
-	auto arr = rapid::ndarray::Array<float, CPU>::fromData({{1, 2, 3}, {4, 5, 6}});
+	auto arr = rapid::ndarray::arange<GPU>(1., 25.).reshaped({2, 3, 4});
 	std::cout << arr << "\n\n";
-	std::cout << arr - rapid::ndarray::mean(arr, 0) << "\n\n";
 	std::cout << rapid::ndarray::var(arr) << "\n\n";
 	std::cout << rapid::ndarray::var(arr, 0) << "\n\n";
 	std::cout << rapid::ndarray::var(arr, 1) << "\n\n";
+	std::cout << rapid::ndarray::var(arr, 2) << "\n\n";
 
 	return 0;
 }

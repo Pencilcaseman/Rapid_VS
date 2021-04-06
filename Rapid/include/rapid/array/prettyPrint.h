@@ -10,6 +10,42 @@ namespace rapid
 	{
 		namespace utils
 		{
+			struct strContainer
+			{
+				std::string str;
+				size_t decimalPoint;
+			};
+
+			/// <summary>
+			/// Format a numerical value and return it as a string
+			/// </summary>
+			/// <typeparam name="t"></typeparam>
+			/// <param name="val"></param>
+			/// <returns></returns>
+			template<typename t>
+			strContainer formatNumerical(const t &val)
+			{
+				std::stringstream stream;
+				stream.precision(std::log((int64_t) val) + 10);
+				stream << val;
+
+				auto lastDecimal = stream.str().find_last_of('.');
+
+				if (std::is_floating_point<t>::value && lastDecimal == std::string::npos)
+				{
+					stream << ".";
+					lastDecimal = stream.str().length() - 1;
+				}
+
+				auto lastZero = stream.str().find_last_of('0');
+
+				// Value is integral
+				if (lastDecimal == std::string::npos)
+					return {stream.str(), stream.str().length() - 1};
+
+				return {stream.str(), lastDecimal};
+			}
+
 			/// <summary>
 			/// Format an std::vector representing a 1D array into a string.
 			/// Not for external use -- internal use only
@@ -144,20 +180,19 @@ namespace rapid
 		template<typename t, ArrayLocation loc>
 		std::string Array<t, loc>::toString(uint64_t startDepth) const
 		{
-			if (loc == CPU)
+			if (isZeroDim)
 			{
-				if (isZeroDim)
-					return std::to_string(dataStart[0]);
-			}
-		#ifdef RAPID_CUDA
-			else if (loc == GPU)
-			{
-				if (isZeroDim)
+				if (loc == CPU)
 				{
-					return std::to_string((t) (*this));
+					return utils::formatNumerical(dataStart[0]).str;
 				}
+			#ifdef RAPID_CUDA
+				else if (loc == GPU)
+				{
+					return utils::formatNumerical((t) (*this)).str;
+				}
+			#endif
 			}
-		#endif
 
 			std::vector<utils::strContainer> formatted(math::prod(shape), {"", 0});
 			size_t longestIntegral = 0;

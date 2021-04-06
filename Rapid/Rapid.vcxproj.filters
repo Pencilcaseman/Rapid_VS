@@ -296,9 +296,6 @@
     <ClInclude Include="include\rapid\graphics\olcPGE\olcPixelGameEngine.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="include\rapid\array\cudaAPI.cuh">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\rapid\array\arrayCore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -317,5 +314,6 @@
     <None Include="include\rapid\graphics\glew\doc\install.html" />
     <None Include="include\rapid\graphics\glew\doc\log.html" />
     <None Include="include\rapid\graphics\glew\doc\wglew.html" />
+    <None Include="include\rapid\array\cudaAPI.cuh" />
   </ItemGroup>
 </Project>
