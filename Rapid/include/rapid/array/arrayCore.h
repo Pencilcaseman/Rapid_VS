@@ -3060,6 +3060,7 @@ namespace rapid
 			/// <returns></returns>
 			inline Array<arrayType, location> transposed(const std::vector<uint64_t> &axes = std::vector<uint64_t>(), bool dataOnly = false) const
 			{
+			#ifdef RAPID_DEBUG
 				if (!axes.empty())
 				{
 					if (axes.size() != shape.size())
@@ -3068,6 +3069,12 @@ namespace rapid
 						if (std::count(axes.begin(), axes.end(), i) != 1)
 							message::RapidError("Transpose Error", "Dimension does not appear only once").display();
 				}
+			#endif
+
+				// Check if a transposition is required
+				bool cpy = !axes.empty();
+				for (uint64_t i = 0; i < axes.size(); i++) if (axes[i] != i) cpy = false;
+				if (cpy) return copy();
 
 				std::vector<uint64_t> newDims;
 
@@ -3086,17 +3093,20 @@ namespace rapid
 							newDims[i] = shape[axes[i]];
 				}
 
+				const uint64_t newDimsProd = math::prod(newDims);
+				const uint64_t shapeProd = math::prod(shape);
+
 				if (location == CPU)
 				{
 					// Edge case for 1D array
 					if (shape.size() == 1 || (axes.size() == 1 && axes[0] == 0))
 					{
 						auto res = Array<arrayType, location>(newDims);
-						memcpy(res.dataStart, dataStart, sizeof(arrayType) * math::prod(newDims));
+						memcpy(res.dataStart, dataStart, sizeof(arrayType) * newDimsProd);
 						return res;
 					}
 
-					if (shape.size() == 2 && shape != newDims)
+					if (shape.size() == 2)
 					{
 						auto res = Array<arrayType, location>(newDims);
 
@@ -3145,24 +3155,23 @@ namespace rapid
 					std::vector<uint64_t> indices(shape.size(), 0);
 					std::vector<uint64_t> indicesRes(shape.size(), 0);
 
-					if (math::prod(shape) < 62000)
+					if (shapeProd < 62000)
 					{
-						auto &tmpShape = shape;
-						for (int64_t i = 0; i < math::prod(tmpShape); i++)
+						for (int64_t i = 0; i < shapeProd; i++)
 						{
 							if (axes.empty())
-								for (int64_t j = 0; j < tmpShape.size(); j++)
-									indicesRes[j] = indices[tmpShape.size() - j - 1];
+								for (int64_t j = 0; j < shape.size(); j++)
+									indicesRes[j] = indices[shape.size() - j - 1];
 							else
-								for (int64_t j = 0; j < tmpShape.size(); j++)
+								for (int64_t j = 0; j < shape.size(); j++)
 									indicesRes[j] = indices[axes[j]];
 
-							res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(tmpShape, indices)];
+							res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(shape, indices)];
 
-							indices[tmpShape.size() - 1]++;
-							int64_t index = tmpShape.size() - 1;
+							indices[shape.size() - 1]++;
+							int64_t index = shape.size() - 1;
 
-							while (indices[index] >= tmpShape[index] && index > 0)
+							while (indices[index] >= shape[index] && index > 0)
 							{
 								indices[index] = 0;
 								index--;
@@ -3172,22 +3181,21 @@ namespace rapid
 					}
 					else
 					{
-						auto &tmpShape = shape;
-						for (int64_t i = 0; i < math::prod(tmpShape); i++)
+						for (int64_t i = 0; i < shapeProd; i++)
 						{
 							if (axes.empty())
-								for (int64_t j = 0; j < tmpShape.size(); j++)
-									indicesRes[j] = indices[tmpShape.size() - j - 1];
+								for (int64_t j = 0; j < shape.size(); j++)
+									indicesRes[j] = indices[shape.size() - j - 1];
 							else
-								for (int64_t j = 0; j < tmpShape.size(); j++)
+								for (int64_t j = 0; j < shape.size(); j++)
 									indicesRes[j] = indices[axes[j]];
 
-							res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(tmpShape, indices)];
+							res.dataStart[imp::dimsToIndex(newDims, indicesRes)] = dataStart[imp::dimsToIndex(shape, indices)];
 
-							indices[tmpShape.size() - 1]++;
-							int64_t index = tmpShape.size() - 1;
+							indices[shape.size() - 1]++;
+							int64_t index = shape.size() - 1;
 
-							while (indices[index] >= tmpShape[index] && index > 0)
+							while (indices[index] >= shape[index] && index > 0)
 							{
 								indices[index] = 0;
 								index--;
@@ -3204,10 +3212,11 @@ namespace rapid
 					if (shape.size() == 1 || (axes.size() == 1 && axes[0] == 0))
 					{
 						auto res = Array<arrayType, location>(newDims);
-						cudaSafeCall(cudaMemcpy(res.dataStart, dataStart, sizeof(arrayType) * math::prod(newDims), cudaMemcpyDeviceToDevice));
+						cudaSafeCall(cudaDeviceSynchronize());
+						cudaSafeCall(cudaMemcpy(res.dataStart, dataStart, sizeof(arrayType) * newDimsProd, cudaMemcpyDeviceToDevice));
 						return res;
 					}
-					else if (shape.size() == 2 && shape != newDims)
+					else if (shape.size() == 2)
 					{
 						uint64_t m = shape[0];
 						uint64_t n = shape[1];
@@ -3217,6 +3226,7 @@ namespace rapid
 						static arrayType alpha = 1;
 						static arrayType beta = 0;
 
+						cudaSafeCall(cudaDeviceSynchronize());
 						cuda::geam(handle::handle,
 								   CUBLAS_OP_T, CUBLAS_OP_T,
 								   m, n,
@@ -3230,70 +3240,86 @@ namespace rapid
 					}
 					else
 					{
-						auto hostThis = new arrayType[math::prod(shape)];
-						cudaSafeCall(cudaMemcpy(hostThis, dataStart, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToHost));
+						// auto hostThis = new arrayType[shapeProd];
+						// cudaSafeCall(cudaMemcpy(hostThis, dataStart, sizeof(arrayType) * shapeProd, cudaMemcpyDeviceToHost));
+						//
+						// auto hostRes = new arrayType[shapeProd];
+						// cudaSafeCall(cudaMemcpy(hostRes, dataStart, sizeof(arrayType) * shapeProd, cudaMemcpyDeviceToHost));
+						//
+						// std::vector<uint64_t> indices(shape.size(), 0);
+						// std::vector<uint64_t> indicesRes(shape.size(), 0);
+						//
+						// if (shapeProd < 62000)
+						// {
+						// 	for (uint64_t i = 0; i < shapeProd; i++)
+						// 	{
+						// 		if (axes.empty())
+						// 			for (uint64_t j = 0; j < shape.size(); j++)
+						// 				indicesRes[j] = indices[shape.size() - j - 1];
+						// 		else
+						// 			for (uint64_t j = 0; j < shape.size(); j++)
+						// 				indicesRes[j] = indices[axes[j]];
+						//
+						// 		hostRes[imp::dimsToIndex(newDims, indicesRes)] = hostThis[imp::dimsToIndex(shape, indices)];
+						//
+						// 		indices[shape.size() - 1]++;
+						// 		uint64_t index = shape.size() - 1;
+						//
+						// 		while (indices[index] >= shape[index] && index > 0)
+						// 		{
+						// 			indices[index] = 0;
+						// 			index--;
+						// 			indices[index]++;
+						// 		}
+						// 	}
+						// }
+						// else
+						// {
+						// 	for (int64_t i = 0; i < shapeProd; i++)
+						// 	{
+						// 		if (axes.empty())
+						// 			for (int64_t j = 0; j < shape.size(); j++)
+						// 				indicesRes[j] = indices[shape.size() - j - 1];
+						// 		else
+						// 			for (int64_t j = 0; j < shape.size(); j++)
+						// 				indicesRes[j] = indices[axes[j]];
+						//
+						// 		hostRes[imp::dimsToIndex(newDims, indicesRes)] = hostThis[imp::dimsToIndex(shape, indices)];
+						//
+						// 		indices[shape.size() - 1]++;
+						// 		int64_t index = shape.size() - 1;
+						//
+						// 		while (indices[index] >= shape[index] && index > 0)
+						// 		{
+						// 			indices[index] = 0;
+						// 			index--;
+						// 			indices[index]++;
+						// 		}
+						// 	}
+						// }
+						//
+						// auto res = Array<arrayType, location>(newDims);
+						// cudaSafeCall(cudaMemcpy(res.dataStart, hostRes, sizeof(arrayType) * shapeProd, cudaMemcpyHostToDevice));
+						//
+						// delete[] hostThis;
+						// delete[] hostRes;
+						//
+						// return res;
 
-						auto hostRes = new arrayType[math::prod(shape)];
-						cudaSafeCall(cudaMemcpy(hostRes, dataStart, sizeof(arrayType) * math::prod(shape), cudaMemcpyDeviceToHost));
+						auto res = Array<arrayType, location>(newDims);
 
-						std::vector<uint64_t> indices(shape.size(), 0);
-						std::vector<uint64_t> indicesRes(shape.size(), 0);
-
-						if (math::prod(shape) < 62000)
+						if (axes.empty())
 						{
-							for (uint64_t i = 0; i < math::prod(shape); i++)
-							{
-								if (axes.empty())
-									for (uint64_t j = 0; j < shape.size(); j++)
-										indicesRes[j] = indices[shape.size() - j - 1];
-								else
-									for (uint64_t j = 0; j < shape.size(); j++)
-										indicesRes[j] = indices[axes[j]];
+							std::vector<uint64_t> tmpAxes(shape.size());
+							for (uint64_t i = 0; i < shape.size(); i++)
+								tmpAxes[i] = shape.size() - i - 1;
 
-								hostRes[imp::dimsToIndex(newDims, indicesRes)] = hostThis[imp::dimsToIndex(shape, indices)];
-
-								indices[shape.size() - 1]++;
-								uint64_t index = shape.size() - 1;
-
-								while (indices[index] >= shape[index] && index > 0)
-								{
-									indices[index] = 0;
-									index--;
-									indices[index]++;
-								}
-							}
+							cuda::array_transpose(shape, newDims, tmpAxes, dataStart, res.dataStart);
 						}
 						else
 						{
-							auto tmpShape = shape;
-							for (int64_t i = 0; i < math::prod(tmpShape); i++)
-							{
-								if (axes.empty())
-									for (int64_t j = 0; j < tmpShape.size(); j++)
-										indicesRes[j] = indices[tmpShape.size() - j - 1];
-								else
-									for (int64_t j = 0; j < tmpShape.size(); j++)
-										indicesRes[j] = indices[axes[j]];
-
-								hostRes[imp::dimsToIndex(newDims, indicesRes)] = hostThis[imp::dimsToIndex(tmpShape, indices)];
-
-								indices[tmpShape.size() - 1]++;
-								int64_t index = tmpShape.size() - 1;
-
-								while (indices[index] >= tmpShape[index] && index > 0)
-								{
-									indices[index] = 0;
-									index--;
-									indices[index]++;
-								}
-							}
+							cuda::array_transpose(shape, newDims, axes, dataStart, res.dataStart);
 						}
-
-						auto res = Array<arrayType, location>(newDims);
-						cudaSafeCall(cudaMemcpy(res.dataStart, hostRes, sizeof(arrayType) * math::prod(shape), cudaMemcpyHostToDevice));
-
-						delete[] hostThis;
-						delete[] hostRes;
 
 						return res;
 					}
@@ -3919,7 +3945,7 @@ namespace rapid
 		#ifdef RAPID_CUDA
 			else if (loc == GPU)
 			{
-				cuda::array_exp(math::prod(arr.shape), arr.dataStart, result.dataStart);
+				cuda::array_exp(math::prod(arr.shape), arr.dataStart, 1, result.dataStart, 1);
 			}
 		#endif
 
@@ -4001,7 +4027,7 @@ namespace rapid
 		{
 			// Default variation calculation on flattened array
 			if (axis == (uint64_t) -1 || arr.shape.size() == 1)
-				return mean(pow(abs(arr - mean(arr)), (t) 2));
+				return mean(square(abs(arr - mean(arr))));
 
 			rapidAssert(axis < arr.shape.size(), "Axis '" + std::to_string(axis) +
 						"' is out of bounds for array with '" + std::to_string(arr.shape.size()) +
@@ -4286,6 +4312,7 @@ namespace rapid
 						res.dataStart[i] = (resT) src.dataStart[i];
 				}
 			}
+		#ifdef RAPID_CUDA
 			else if (loc == CPU && srcL == GPU)
 			{
 				if (math::prod(src.shape) < 10000)
@@ -4334,6 +4361,7 @@ namespace rapid
 			{
 				cuda::array_cast((unsigned int) math::prod(src.shape), src.dataStart, 1, res.dataStart, 1);
 			}
+		#endif
 
 			return res;
 		}

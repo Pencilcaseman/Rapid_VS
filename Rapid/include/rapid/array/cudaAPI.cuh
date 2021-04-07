@@ -30,7 +30,7 @@ namespace rapid
 				}
 
 				__global__
-					void rowToColumnOrdering_float(unsigned int rows, unsigned int cols, const float *arr, float *res)
+					void rowToColumnOrdering_float(const unsigned int rows, const unsigned int cols, const float *__restrict arr, float *__restrict res)
 				{
 					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
 					unsigned int stride = blockDim.x * gridDim.x;
@@ -45,7 +45,7 @@ namespace rapid
 				}
 
 				__global__
-					void rowToColumnOrdering_double(unsigned int rows, unsigned int cols, const double *arr, double *res)
+					void rowToColumnOrdering_double(const unsigned int rows, const unsigned int cols, const double *__restrict arr, double *__restrict res)
 				{
 					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
 					unsigned int stride = blockDim.x * gridDim.x;
@@ -60,7 +60,7 @@ namespace rapid
 				}
 
 				__global__
-					void columnToRowOrdering_float(unsigned int rows, unsigned int cols, const float *arr, float *res)
+					void columnToRowOrdering_float(const unsigned int rows, const unsigned int cols, const float *__restrict arr, float *__restrict res)
 				{
 					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
 					unsigned int stride = blockDim.x * gridDim.x;
@@ -75,7 +75,7 @@ namespace rapid
 				}
 
 				__global__
-					void columnToRowOrdering_double(unsigned int rows, unsigned int cols, const double *arr, double *res)
+					void columnToRowOrdering_double(const unsigned int rows, const unsigned int cols, const double *__restrict arr, double *__restrict res)
 				{
 					unsigned int index = blockIdx.x * blockDim.x + threadIdx.x;
 					unsigned int stride = blockDim.x * gridDim.x;
@@ -624,6 +624,59 @@ namespace rapid
 					{
 						res[i * N] = std::abs(arr[i * M]);
 					}
+				}
+
+				template<typename t>
+				__global__
+					void array_transpose(const uint64_t dims, const uint64_t *shape, const uint64_t *newDims, const uint64_t *axes, const uint64_t shapeProd, const t *data, t *res)
+				{
+					uint64_t *indices = new uint64_t[dims];
+					uint64_t *indicesRes = new uint64_t[dims];
+
+					for (uint64_t i = 0; i < dims; i++)
+					{
+						indices[i] = 0;
+						indicesRes[i] = 0;
+					}
+
+					for (uint64_t i = 0; i < shapeProd; i++)
+					{
+						for (int64_t j = 0; j < dims; j++)
+							indicesRes[j] = indices[axes[j]];
+
+						uint64_t resIndex = 0;
+						for (long int i = 0; i < dims; i++)
+						{
+							uint64_t sub = indicesRes[i];
+							for (uint64_t j = i; j < dims - 1; j++)
+								sub *= newDims[j + 1];
+							resIndex += sub;
+						}
+
+						uint64_t dataIndex = 0;
+						for (long int i = 0; i < dims; i++)
+						{
+							uint64_t sub = indices[i];
+							for (uint64_t j = i; j < dims - 1; j++)
+								sub *= shape[j + 1];
+							dataIndex += sub;
+						}
+
+						res[resIndex] = data[dataIndex];
+
+						indices[dims - 1]++;
+						uint64_t index = dims - 1;
+
+						while (indices[index] >= shape[index] && index > 0)
+						{
+							indices[index] = 0;
+							index--;
+							indices[index]++;
+						}
+					}
+
+					delete[] indices;
+					delete[] indicesRes;
 				}
 			}
 
@@ -1271,8 +1324,34 @@ namespace rapid
 
 				if (sync)
 					cudaSafeCall(cudaDeviceSynchronize());
-				
+
 				kernel::array_abs << <numBlocks, blockSize >> > (size, arr, M, res, N);
+			}
+
+			template<typename t>
+			inline void array_transpose(const std::vector<uint64_t> &shape, const std::vector<uint64_t> &newDims, const std::vector<uint64_t> &axes, const t *data, t *res, int sync = 1)
+			{
+				const uint64_t dims = shape.size();
+				uint64_t *deviceShape, *deviceNewDims, *deviceAxes;
+				const uint64_t shapeProd = math::prod(shape);
+
+				cudaSafeCall(cudaMalloc(&deviceShape, sizeof(uint64_t) * dims));
+				cudaSafeCall(cudaMalloc(&deviceNewDims, sizeof(uint64_t) * dims));
+				cudaSafeCall(cudaMalloc(&deviceAxes, sizeof(uint64_t) * dims));
+				
+				cudaSafeCall(cudaMemcpy(deviceShape, shape.data(), sizeof(uint64_t) * dims, cudaMemcpyHostToDevice));
+				cudaSafeCall(cudaMemcpy(deviceNewDims, newDims.data(), sizeof(uint64_t) * dims, cudaMemcpyHostToDevice));
+				cudaSafeCall(cudaMemcpy(deviceAxes, axes.data(), sizeof(uint64_t) * dims, cudaMemcpyHostToDevice));
+
+				if (sync)
+					cudaSafeCall(cudaDeviceSynchronize());
+
+				kernel::array_transpose << <1, 1 >> > (dims, deviceShape, deviceNewDims, deviceAxes, shapeProd, data, res);
+				cudaSafeCall(cudaDeviceSynchronize());
+
+				cudaSafeCall(cudaFree(deviceShape));
+				cudaSafeCall(cudaFree(deviceNewDims));
+				cudaSafeCall(cudaFree(deviceAxes));
 			}
 		}
 	}
